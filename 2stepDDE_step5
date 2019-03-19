@@ -1,0 +1,153 @@
+# This code for step 3 
+# We need rearrage this code as function to setup entire steps
+
+
+
+# initial parameter 
+B.X=0.05; B.Y=0.05; a = 18/5; b=3/5;a_A  =0.0001; b_A=0.0001;
+
+#read data 
+folder = "/Users/cbskust/Dropbox/2stepDDE/"
+X = read.csv(file = paste(folder,"X",".csv",sep=""),header = T)
+Y = read.csv(file = paste(folder,"Y",".csv",sep=""),header = T)
+thin=10; # set time interval as i minute
+
+sel = seq(1,nrow(X), by=thin)
+min = mean(diff(X[sel,1]))
+X = as.matrix(X[sel,-1])
+Y = as.matrix(Y[sel,-1])
+
+time = nrow(Y) - 1 # T
+v.num =ncol(Y) # N
+
+
+
+
+#sampling r_n1i
+# Step 5.1
+# X.diff = apply(X, 2, diff)
+# r_n1i = X.diff + matrix(rpois(length(X[-nrow(Y),]),X[-nrow(Y),]*B.Y),nrow = time)
+
+impute_r <- function(y){
+  Y.diff = diff(y)
+  r_n1i = Y.diff + rpois(time,y[-(time+1)]*B.Y)
+  return(r_n1i)
+}
+
+
+
+# This function calculates kappa Eq. (5) and Eq. (6) in Supplement and gamma_k(m, Delta) in page 3.
+# Returning the cumulative sum of kappa: sum_{m=0}^{i}kappa(delta,m) in Eq. (6) in Supplement. 
+# P: shape parameter alpha and rate parameter of beta in gamma delay distribution.
+KI <- function(P, ti=time){
+  a = P[1];       #shape parameter alpha of gamma distribution in Eq. (5) and Eq. (6) in Supplement  
+  b = P[2];         #rate parameter beta of gamma distribution in Eq. (5) and Eq. (6) in Supplement .
+  f <-function(x) pgamma(x,a,rate=b)
+  k.j = rep(1,ti)
+  for (m in 1:ti){           #discretized integral kappa(delta, m) of Eq. (5) and Eq. (6) in Supplement 
+    k.j[m] = integrate(f,m-1,m)$value
+  }
+  return(k.j)
+}       
+
+# Metropolis-Hastings step for shape parameter alpha of gamma delay distribution
+# MH with random walk chain is used in the function 
+# contional posterior; alpha | beta, r_1i, i=0,1,...,(T-1)
+# p =(alpha, beta): parameter value at the current step in MCMC
+# Ri: T by 1 vertor (r_{11}, r_{12}, ..., r_{i,T-1} )
+# This function returns upadated alpha & current value of beta
+# refering Chib and Greenburg (1995) & son and Oh (2006)
+# using non informative gamma prior for alpha
+MH.P.a <- function(P, Ri, tun) {
+  a.m <- P[1]
+  b.m <- P[2]
+  a.star <- a.m + rnorm(1, 0, tun[1])
+  while (a.star < 0) { 
+    a.star <- a.m + rnorm(1, 0, tun[1])
+  }
+  P.star <- c(a.star, b.m)
+  KI.star <- KI(P.star) # calculating kappa using candidate of alpha & current beta
+  KI.m <- KI(P)         # calculating kappa using current alpha & beta
+  l.lik.st <- 0
+  l.lik <- 0
+  for (i in 1:v.num) {
+    Rii <- Ri[,i]
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star + 1e-300)) - (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m + 1e-300)) - (sum(KI.m))
+  }
+  l.prior.st <- dgamma(a.star, pri.al[1], pri.al[2], log = TRUE)
+  l.prior <- dgamma(a.m, pri.al[1], pri.al[2], log = TRUE)
+  logMH <- (l.lik.st - l.lik + l.prior.st - l.prior 
+            + pnorm(a.m, 0,  tun[1], log.p = T) - pnorm(a.star, 0, tun[1], log.p = T))
+  if (!is.nan(logMH) && runif(1) < exp(logMH)) {
+    P <- P.star; count = 1;
+  }
+  return(list(P=P, count=count))
+}
+
+
+
+
+
+# Metropolis-Hastings step for rate parameter beta of gamma delay distribution
+# MH with random walk chain is used in the function 
+# contional posterior: beta| alpha, r_1i, i=0,1,...,(T-1)
+# p =(alpha, beta): parameter value at the current step in MCMC
+# Ri: T by 1 vertor (r_{11}, r_{12}, ..., r_{i,T-1} )
+# This function returns upadated beta & current value of alpha 
+# refering Chib and Greenburg (1995) & Son and Oh (2006)
+# using non informative gamma prior for beta
+
+MH.P.b <- function(P, Ri, tun) {
+  count = 0
+  a.m <- P[1]
+  b.m <- P[2]
+  b.star <- rgamma(1, b.m * tun, rate = tun)
+  P.star <- c(a.m, b.star)
+  KI.star <- KI(P.star)      # calculating kappa using current alpha & candidate of beta
+  KI.m <- KI(P)              # calculating kappa using current alpha & beta
+  l.lik.st <- 0
+  l.lik <- 0
+  for (i in 1:v.num) {
+    Rii <- Ri[, i]
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star)) - (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m)) - (sum(KI.m))
+  }
+  l.prior.st <- dgamma(b.star, pri.be[1], pri.be[2], log = TRUE)
+  l.prior <- dgamma(b.m, pri.be[1], pri.be[2], log = TRUE)
+  l.prop.st <- dgamma(b.star, b.m * tun, rate = tun, log = T)
+  l.prop <- dgamma(b.m, b.star * tun, rate = tun, log = T)
+  logMH <- l.lik.st - l.lik + l.prior.st - l.prior - l.prop.st + l.prop
+  if (!is.nan(logMH) && runif(1) < exp(logMH)) {
+    P <- P.star; count = 1;
+  }
+  return(list(P=P, count=count))
+}
+
+
+# samping r_n1i and put them to RR 
+count_al=0; count_be=0; 
+p=c(18/5, 5/3); # initial value of alpha & beta for tau_x
+tun.al=2.4; tun.be=2.4; # tunning constant of MH algorithm for alpha & beta 
+
+RR = matrix(0, nrow = time, ncol = v.num)
+for(n in 1:v.num){
+  RR[,n]=impute_r(X[,n])
+}
+
+p.update = MH.P.a(p, RR, tun = tun.al) 
+p <- p.update$P
+count_al <- count_al+ p.update$count
+
+p.update = MH.P.b(p, RR, tun = tun.be) 
+p <- p.update$P
+count_be <- count_be+ p.update$count
+
+
+
+
+
+
+
+
+
