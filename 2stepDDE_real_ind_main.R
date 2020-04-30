@@ -9,8 +9,6 @@ int = 1 ;
 # read data
 raw.data = read.csv("2mM_IPTG.csv",header = F)
 
-max.T <- 25; # 
-data.num <- 49;
 # rawdata <- round(all.data[1:(max.T+1),1:data.num]);     
 diffdata <- matrix(0, nrow = nrow(raw.data), ncol = ncol(raw.data)); 
 for(i in 1:ncol(diffdata)){
@@ -27,7 +25,7 @@ nmlzdata1 = round(diffdata/0.089)[1:27,1:49]; # data from experiment 1
 nmlzdata2 = round(diffdata/0.089)[1:32,50:88]; # data from experiment 2
 
 Y = nmlzdata1[,7] # choose one data.
-plot(Y)
+max.T <- length(Y) - 1;
 X <- Y # X is hidden, but we set it as Y. It is almost meaningless.
 
 # known (fixed) parameters
