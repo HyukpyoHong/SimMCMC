@@ -15,8 +15,8 @@ for(i in 1:ncol(diffdata)){
   diffdata[,i]=raw.data[,i] - raw.data[1,i]
 }
 
-for (i in 1:(max.T+1)) {
-  for (j in 1:data.num) {
+for (i in 1:nrow(raw.data)) {
+  for (j in 1:ncol(raw.data)) {
     if(diffdata[i,j]<0) diffdata[i,j] =0
   }
 }
