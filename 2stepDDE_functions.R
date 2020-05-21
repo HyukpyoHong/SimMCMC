@@ -3,7 +3,7 @@ library(mvtnorm)
 library(MASS)
 
 
-impute_r.X <- function(x){
+impute_r.X <- function(x, B.X){
   X.diff = diff(x)
   r4 = rpois(length(X.diff),B.X*(x[-length(x)]+x[-1])/2)
   r3 = round(X.diff + r4) # input x could be a non-integer, so r3 should rounded to be an integer.
@@ -17,7 +17,7 @@ impute_r.X <- function(x){
 #sampling r_1i and r_2i
 # Step 1 & 2
 # generating only 1 set of number of reaction of Y; 
-impute_r.Y <- function(y){
+impute_r.Y <- function(y, B.Y){
   Y.diff = diff(y)
   r2 = rpois(length(Y.diff),B.Y*(y[-length(y)]+y[-1])/2)
   r1 = Y.diff + r2
@@ -25,7 +25,7 @@ impute_r.Y <- function(y){
 }
 
 #generating 1000 sets of number of reaction Y and calculating average of number of reaction of Y; 
-impute_r.Y.mean <- function(y){
+impute_r.Y.mean <- function(y, B.Y){
   Y.diff = diff(y)
   r2.all = rep(0,length(Y.diff)); r1.all =rep(0,length(Y.diff));
   for(i in 1:1000){
@@ -137,6 +137,60 @@ TimeDelayGillespieforX <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, max
     }
   }
   my_list <- list("XList" = XList, "TList" = TList)
+  return(my_list)
+}
+
+TimeDelayGillespieforXR <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, maxT = 100){
+  X <- 0
+  XList <- rep(NA, repnum)
+  Xbirth <- rep(0, maxT)
+  Xdeath <- rep(0, maxT)
+  currentTime <- 0
+  TList <- rep(NA, repnum)
+  n <- 1
+  k <- 1
+  stackTimeX <- c()
+  
+  for (i in 1:repnum){
+    a1 <- A.X
+    a2 <- B.X * X
+    a0 <- sum(a1,a2)
+    # r2 <- runif(1)
+    currentTime <- currentTime + rexp(1, rate = a0)
+    
+    stackTimeX <- sort(stackTimeX)  
+    if(!(is.null(stackTimeX))){
+      minStack <- min(stackTimeX)
+    } else {
+      minStack <- Inf
+    }
+    if (currentTime < minStack){                                    
+      r1 <- runif(1)
+      if (r1 < a1/a0){
+        XList[i] <- X
+        TList[i] <- currentTime
+        stackTimeX <- c(stackTimeX, currentTime + k*rgamma(n=1, shape = alpha.X, rate = beta.X))
+        #stackTimeX <- c(stackTimeX, currentTime)
+      } else{
+        # death of X occurs
+        X <- X-1;
+        XList[i] <- X
+        TList[i] <- currentTime
+        Xdeath[ceiling(currentTime)] = Xdeath[ceiling(currentTime)] + 1
+      } 
+    } else{
+      X <- X+1;
+      XList[i] <- X
+      TList[i] <- minStack
+      currentTime <- minStack
+      stackTimeX <- stackTimeX[-1]
+      Xbirth[ceiling(currentTime)] = Xbirth[ceiling(currentTime)] + 1
+    }
+    if (currentTime > maxT){
+      break
+    }
+  }
+  my_list <- list("XList" = XList, "TList" = TList, "Xbirth" = Xbirth, "Xdeath" = Xdeath)
   return(my_list)
 }
 
@@ -446,6 +500,7 @@ MH.X.R_XY <-function(r,x,kix,kiy,km, thetax, bi=tun.B){# if b=tun.B then remove 
   return(list(r=r, x=x, count=count))
 }
 
+
 # This function calculates kappa Eq.(S9) in Sup. and gamma_k(m, Delta) 5th Eq. in page 2.
 # Returning the cumulative sum of kappa: sum_{m=0}^{i}kappa(delta,m) in Eq. (S8) in Sup. 
 # P: shape parameter alpha and rate parameter of beta in gamma delay distribution. 
@@ -554,7 +609,7 @@ MH.P.X <- function(P,S,rep, Ri, A, tun = tun.Delta.X, maxt) {
   KI.m <- KI(P, maxt = maxt)              # calculating kappa using current alpha & beta
   l.lik.st <- 0
   l.lik <- 0
-  for (i in 1:data.num) {
+  for (i in 1:1) {
     Rii <- Ri[, 1]
     l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - A * (sum(KI.star))
     l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - A * (sum(KI.m))
@@ -563,7 +618,10 @@ MH.P.X <- function(P,S,rep, Ri, A, tun = tun.Delta.X, maxt) {
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
-  logMH <- l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2  
+  logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+            + log(pmvnorm(upper = c(P[1],P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+            - log(pmvnorm(upper = c(P.star[1],P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  
   alpha = min (exp(logMH),1)
   if(!is.nan(alpha) && runif(1)<alpha){
     P <- P.star;count = 1;
@@ -572,7 +630,7 @@ MH.P.X <- function(P,S,rep, Ri, A, tun = tun.Delta.X, maxt) {
   if(is.nan(min(S.update))) S.update=S
   S.update=(S.update+S)/2;
   return(list(P=P, S=S.update, count=count))
-}
+} 
 
 MH.P.X.all <- function(P,S,rep, Ri, A, tun, maxt) {
   count = 0
@@ -586,7 +644,7 @@ MH.P.X.all <- function(P,S,rep, Ri, A, tun, maxt) {
   KI.m <- KI(P, maxt = maxt)              # calculating kappa using current alpha & beta
   l.lik.st <- 0
   l.lik <- 0
-  for (i in 1:data.num) {
+  for (i in 1:dim(Ri)[3]){
     Rii <- Ri[, 1, i]
     l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - A * (sum(KI.star))
     l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - A * (sum(KI.m))
@@ -712,8 +770,8 @@ MH.X.ind.gamma <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, u
   
   prop.X.st = sum(prop.X.st, na.rm = T)
   prop.X    = sum(prop.X   , na.rm = T)
-  prior.X.st = sum(dgamma(x.star[i] + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
-  prior.X   = sum(dgamma(x[i] + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
+  prior.X.st = sum(dgamma(x.star + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
+  prior.X   = sum(dgamma(x + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
   
   logMH <- (q.Y.st - q.Y  + q.X.st - q.X + prior.X.st - prior.X  # posterior Dist. 
             - prop.X.st + prop.X)                   # proposal Dist. 
@@ -738,26 +796,24 @@ MH.X.ind.gamma <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, u
   return(list(x=x, count=count))
 }
 
-MH.XR.ind.gamma <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, useall = FALSE){
-  x.star = x
-  rx.st <- matrix(rep(0,2*(length(x)-1)),ncol=2,nrow = (length(x)-1))
-  rx <- matrix(rep(0,2*(length(x)-1)),ncol=2,nrow = (length(x)-1))
+MH.XR.ind.gamma <-function(r,x,kix,km, thetax, m = mean.x, bi, ptnum = 4, useall = TRUE, A.Y){
+  x.star <- x
+  rx.st <- matrix(0, ncol=2,nrow = (length(x)-1))
+  # rx <- matrix(0, ncol=2,nrow = (length(x)-1))
   
   prop.X.st = rep(0,length(x))
   prop.X    = rep(0,length(x))
-  H0.X.st = matrix(rep(0,2*(length(x)-1)),ncol=2,nrow = (length(x)-1))
-  H0.X    = matrix(rep(0,2*(length(x)-1)),ncol=2,nrow = (length(x)-1))
+  H0.X.st = matrix(0, ncol=2,nrow = (length(x)-1))
+  H0.X    = matrix(0, ncol=2,nrow = (length(x)-1))
   
   for (i in 2:length(x)){
     x.star[i] = rgamma(1, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1) # x.star: a candidate for the next X.
-    # prop.X.st[i] = dnorm(log(x.star[i]+1e-300), mean = m[i], sd = bi[i], log = T)
-    # prop.X[i]    = dnorm(log(x[i]+1e-300)     , mean = m[i], sd = bi[i], log = T)
-    
-    prop.X.st[i] = dgamma(x.star[i] + 1e-1, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1)
-    prop.X[i]    = dgamma(x[i] + 1e-1, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1)
+    prop.X.st[i] = dgamma(x.star[i] + 1e-2, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1)
+    prop.X[i]    = dgamma(x[i] + 1e-2, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1)
     
     H0.X.st[i-1,] = (H.X(x.star[i-1], kix[i-1], thetax)+H.X(x.star[i], kix[i-1], thetax))/2
     H0.X[i-1,]    = (H.X(x[i-1]     , kix[i-1], thetax)+H.X(x[i]     , kix[i-1], thetax))/2
+    #H0.X = (birth propensity of X, death propensity of X) at time i.
   }
   if (useall == TRUE){
     fy.st = A.Y * KI.Y(Delta.Y,in.X = x.star, K.M=km)
@@ -766,41 +822,133 @@ MH.XR.ind.gamma <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, 
     fy.st = A.Y * KI.Ynt(Delta.Y,in.X = x.star, N = ptnum, K.M=km)
     fy    = A.Y * KI.Ynt(Delta.Y,in.X = x     , N = ptnum, K.M=km)
   }
-  
-  rx.st <- impute_r.X(x.star)
-  rx <- impute_r.X(x)
-  if(rx[1,1] == -1 | rx.st[1,1] == -1){
-    return(list(x=x, count = 0, rx = r[,3:4], errflg = 1))
-  }else if(rx[1,1] == -1 | rx.st[1,1] != -1){
-    return(list(x=x.star, count= 1 , rx = rx.st, errflg = 2))
+  gg<<-x.star
+  rx.st <- impute_r.X(x.star, B.X = thetax[2])
+  rx <- r[,3:4]
+  if(rx.st[1,1] == -1){
+    return(list(x=x, count = 0, rx = rx, errflg = 1))
   }
-  q.X.bir.st = sum(log(dpois(rx.st[,1], H0.X.st[,1])+1e-300), na.rm = T)
-  q.X.bir    = sum(log(dpois(rx[,1], H0.X[,1]   )+1e-300), na.rm = T)
-  q.X.dea.st = sum(log(dpois(rx.st[,2], H0.X.st[,2])+1e-300), na.rm = T)
-  q.X.dea    = sum(log(dpois(rx[,2], H0.X[,2]   )+1e-300), na.rm = T)
+  
+  q.X.bir.st = sum(log(dpois(rx.st[,1], H0.X.st[,1]) + 1e-300), na.rm = T)
+  q.X.bir    = sum(log(dpois(rx[,1], H0.X[,1]   ) + 1e-300), na.rm = T)
+  
+  # q.X.dea.st = sum(log(dpois(rx.st[,2], H0.X.st[,2])+1e-300), na.rm = T)
+  # q.X.dea    = sum(log(dpois(rx[,2], H0.X[,2]   )+1e-300), na.rm = T)
+  
+  q.X.dea.st <- 0
+  q.X.dea    <- 0
   
   q.Y.st = sum(log(dpois(r[,1],fy.st[,1])+1e-300), na.rm = T)
   q.Y    = sum(log(dpois(r[,1],fy[,1]   )+1e-300), na.rm = T)
   
-  prop.X.st = sum(prop.X.st, na.rm = T)
-  prop.X    = sum(prop.X   , na.rm = T)
+  prop.X.st = sum(log(prop.X.st + 1e-300), na.rm = T);# prop.X.st <- 0;
+  prop.X    = sum(log(prop.X + 1e-300)   , na.rm = T);# prop.X <- 0;
   
-  prior.X.st = sum(dgamma(x.star[i] + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
-  prior.X   = sum(dgamma(x[i] + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
+  # prior.X.st = sum(dgamma(x.star[i] + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
+  # prior.X   = sum(dgamma(x[i] + 1e-1 , shape = 1, rate = 1e-2)) # non-informative gamma prior
   
+  prior.X.st = sum(log(dgamma(x.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+  prior.X   = sum(log(dgamma(x, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+  
+  # logMH <- (q.Y.st - q.Y  + q.X.bir.st + q.X.dea.st - q.X.bir - q.X.dea + prior.X.st - prior.X  # posterior Dist. 
+  #           - prop.X.st + prop.X - prop.rx.st + prop.rx)                   # proposal Dist. 
   logMH <- (q.Y.st - q.Y  + q.X.bir.st + q.X.dea.st - q.X.bir - q.X.dea + prior.X.st - prior.X  # posterior Dist. 
-            - prop.X.st + prop.X)                   # proposal Dist. 
-  
+            - prop.X.st + prop.X)
   count <- 0;
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
     x=x.star; count = 1; rx <- rx.st
   }    
-  return(list(x=x, count=count, rx=rx,errflg = 0))
-  # return(list(x=x, count=count, rx=rx, q.X.bir.st = q.X.bir.st, q.X.dea.st = q.X.dea.st, q.X.bir = q.X.bir, q.X.dea = q.X.dea, 
-  #             q.Y.st=q.Y.st, q.Y=q.Y, prop.X.st=prop.X.st, prop.X = prop.X, 
-  #             prior.X.st = prior.X.st, prior.X = prior.X, errflg = 0))
+  
+  # return(list(x=x, count=count, rx=rx,errflg = 0))
+  return(list(x=x, count=count, rx=rx, q.X.bir.st = q.X.bir.st, q.X.dea.st = q.X.dea.st, q.X.bir = q.X.bir, q.X.dea = q.X.dea,
+              q.Y.st=q.Y.st, q.Y=q.Y, prop.X.st=prop.X.st, prop.X = prop.X,
+              prior.X.st = prior.X.st, prior.X = prior.X, errflg = 0))
 }
 
+
+
+MH.XR.ind.gamma.all <-function(r.all , x.all ,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, useall = TRUE, A.Y){
+  # r.all: (data.num) * (max.T) * 2 matrix. The birth and death numbers of Y's;
+  # x.all: (data.num) * (max.T+1) matrix. X trajectory for each Y.
+  data.num <- dim(r.all)[1];
+  maxt <- dim(r.all)[2];
+  
+  x.all.star = x.all
+  # rx.st <- matrix(0, ncol=2, nrow = maxt)
+  # rx <- matrix(0, ncol=2, nrow = maxt)
+  rx.st <- array(0, dim = c(data.num, maxt, 2))
+  rx <- array(0, dim = c(data.num, maxt, 2))
+  
+  prop.X.st = rep(0,length(x))
+  prop.X    = rep(0,length(x))
+  H0.X.st = array(0, dim = c(data.num, maxt, 2))
+  H0.X    = array(0, dim = c(data.num, maxt, 2))
+  
+  fy <- 0; fy.st <- 0;
+  q.X.bir.st <- 0; q.X.bir <- 0;
+  q.X.dea.st <- 0; q.X.dea <- 0;
+  q.Y.st <- 0; q.Y <- 0;
+  prior.X.st <- 0; prior.X <- 0;   
+  
+  
+  for(j in 1:data.num){
+    for(i in 2:(maxt+1)){
+      x.all.star[j,i] = rgamma(1, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1) # x.star: a candidate for the next X.
+      # prop.X.st[i] = dnorm(log(x.star[i]+1e-300), mean = m[i], sd = bi[i], log = T)
+      # prop.X[i]    = dnorm(log(x[i]+1e-300)     , mean = m[i], sd = bi[i], log = T)
+      
+      prop.X.st[i] = prop.X.st[i] + dgamma(x.all.star[j,i] + 1e-2, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1)
+      prop.X[i]    = prop.X[i] + dgamma(x.all[j,i] + 1e-2, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2 + 1e-1)
+      
+      H0.X.st[j,i-1,] = H0.X.st[j,i-1,] + (H.X(x.all.star[j,i-1], kix[i-1], thetax)+H.X(x.all.star[j,i], kix[i-1], thetax))/2
+      H0.X[j,i-1,]    = H0.X[j,i-1,] + (H.X(x.all[j,i-1]     , kix[i-1], thetax)+H.X(x.all[j,i]     , kix[i-1], thetax))/2
+      #H0.X = (birth propensity of X, death propensity of X) at time i.
+    }
+    if (useall == TRUE){
+      fy.st = fy.st + A.Y * KI.Y(Delta.Y,in.X = x.all.star[j,], K.M=km)
+      fy    = fy + A.Y * KI.Y(Delta.Y,in.X = x.all[j,]     , K.M=km)
+    }else{
+      fy.st = fy.st + A.Y * KI.Ynt(Delta.Y,in.X = x.all.star[j,], N = ptnum, K.M=km)
+      fy    = fy + A.Y * KI.Ynt(Delta.Y,in.X = x.all[j,]     , N = ptnum, K.M=km)
+    }
+
+    rx.st[j,,] <- impute_r.X(x.all.star[j,], B.X = thetax[2])
+    rx[j,,] <- impute_r.X(x.all[j,], B.X = thetax[2])
+    if(rx.st[j,1,1] == -1){
+      return(list(x=x.all, count = 0, rx = r[,,3:4], errflg = 1))
+    }else if(rx[j,1,1] == -1 & rx.st[1,1] != -1){
+      return(list(x=x.all.star, count= 1 , rx = rx.st, errflg = 2))
+    }
+    
+    q.X.bir.st = q.X.bir.st + sum(log(dpois(rx.st[j,,1], H0.X.st[j,,1])+1e-300), na.rm = T)
+    q.X.bir    = q.X.bir    + sum(log(dpois(rx[j,,1], H0.X[j,,1]   )+1e-300), na.rm = T)
+    # q.X.dea.st = q.X.dea.st + sum(log(dpois(rx.st[j,,1], H0.X.st[j,,2])+1e-300), na.rm = T)
+    # q.X.dea    = q.X.dea    + sum(log(dpois(rx[j,,1], H0.X[j,,2]   )+1e-300), na.rm = T)
+    q.X.dea.st <- 0;
+    q.X.dea <- 0;
+    
+    q.Y.st = q.Y.st + sum(log(dpois(r[,1],fy.st[,1])+1e-300), na.rm = T)
+    q.Y    = q.Y    + sum(log(dpois(r[,1],fy[,1]   )+1e-300), na.rm = T)
+    
+
+  }
+  
+  prior.X.st = sum(log(dgamma(x.all.star, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+  prior.X   = sum(log(dgamma(x.all, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+  prop.X.st = sum(log(prop.X.st + 1e-300), na.rm = T)
+  prop.X    = sum(log(prop.X + 1e-300)   , na.rm = T)
+  
+  logMH <- (q.Y.st - q.Y  + q.X.bir.st + q.X.dea.st - q.X.bir - q.X.dea + prior.X.st - prior.X  # posterior Dist. 
+            - prop.X.st + prop.X)                   # proposal Dist. 
+  count <- 0;
+  if(!is.nan(logMH) && runif(1)<exp(logMH)) {
+    x=x.all.star; count = 1; rx <- rx.st
+  }    
+  # return(list(x=x, count=count, rx=rx,errflg = 0))
+  return(list(x=x, count=count, rx=rx, q.X.bir.st = q.X.bir.st, q.X.dea.st = q.X.dea.st, q.X.bir = q.X.bir, q.X.dea = q.X.dea,
+              q.Y.st=q.Y.st, q.Y=q.Y, prop.X.st=prop.X.st, prop.X = prop.X,
+              prior.X.st = prior.X.st, prior.X = prior.X, errflg = 0))
+}
 
 MH.XR.ind <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, useall = FALSE){
   count=0
@@ -944,15 +1092,15 @@ MH.KM <- function(km, s, rep, r, x, b=tun.KM){
   #              + (A.Y*x[-1])/(km      + x[-1]))/2
   lambda.st = A.Y * KI.Y(Delta.Y,x, K.M=km.star)
   lambda    = A.Y * KI.Y(Delta.Y,x     , K.M=km)
-  l.lik.st = sum(log(dpois(r,lambda.st)+1e-300))
-  l.lik    = sum(log(dpois(r,lambda   )+1e-300))
+  l.lik.st = sum(log(dpois(r,lambda.st[,1])+1e-300))
+  l.lik    = sum(log(dpois(r,lambda[,1])+1e-300))
   logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
            + pnorm(km, 0, s*b, log.p = T) - pnorm(km.star, 0, s*b, log.p = T)) 
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
     km=km.star; count = 1;
   }
   alpha = min(exp(logMH),1)
-  s=ramcmc::adapt_S(s,u,alpha,rep,gamma = min(1,(1*rep)^(-2/3)))
+  s = ramcmc::adapt_S(s,u,alpha,rep,gamma = min(1,(1*rep)^(-2/3)))
   return(list(km=km,s=s, count=count, l.lik = l.lik, l.lik.st = l.lik.st))
 }
 
@@ -968,15 +1116,14 @@ MH.KM.all <- function(km, s, rep, r.all, x.all, b=tun.KM){
   len = nrow(x.all)
   l.lik.st = 0;
   l.lik = 0;
-  for(j in 1:data.num){
+  
+  for(j in 1:ncol(x.all)){
     x = x.all[,j]
     r = r.all[,j]
-    lambda.st = ((A.Y*x[-len])/(as.vector(km.star) + x[-len]) 
-                 + (A.Y*x[-1])/(as.vector(km.star) + x[-1]))/2
-    lambda    = ((A.Y*x[-len])/(km      + x[-len]) 
-                 + (A.Y*x[-1])/(km      + x[-1]))/2
-    l.lik.st = l.lik.st + sum(log(dpois(r,lambda.st)+1e-300))
-    l.lik    = l.lik    + sum(log(dpois(r,lambda   )+1e-300))
+    lambda.st = A.Y * KI.Y(Delta.Y,x, K.M=km.star)
+    lambda    = A.Y * KI.Y(Delta.Y,x,      K.M=km)
+    l.lik.st = l.lik.st + sum(log(dpois(r,lambda.st[,1])+1e-300))
+    l.lik    = l.lik    + sum(log(dpois(r,lambda[,1]   )+1e-300))
   }
   
   logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
