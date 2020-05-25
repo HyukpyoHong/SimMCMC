@@ -1084,11 +1084,11 @@ MH.XR.ind <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, useall
 # refering Vihola(2012), Statistics and Computing, 22(5):997-1008. 
 # using informative gamma prior for beta
 
-MH.KM <- function(km, s, rep, r, x, b, pri.KM){
+MH.KM <- function(km, s, rep, r, x, b, pri.KM, Delta.Y){
   # km: Michaelis-Menten constant in the current iteration.
   # s: scaling factor for tunning
   # rep: iteration number
-  # x: X trajectories to construct the likelihood for the birth of Y 
+  # x: X trajectory to construct the likelihood for the birth of Y 
   # b: tunning parameters for KM
   # pri.KM : prior distribution parameters for KM
   
@@ -1117,7 +1117,7 @@ MH.KM <- function(km, s, rep, r, x, b, pri.KM){
 }
 
 
-MH.KM.all <- function(km, s, rep, r.all, x.all, b, pri.KM){
+MH.KM.all <- function(km, s, rep, r.all, x.all, b, pri.KM, Delta.Y){
   # km: Michaelis-Menten constant in the current iteration.
   # s: scaling factor for tunning
   # rep: iteration number
@@ -1136,8 +1136,46 @@ MH.KM.all <- function(km, s, rep, r.all, x.all, b, pri.KM){
   l.lik.st = 0;
   l.lik = 0;
   
-  for(j in 1:ncol(x.all)){
+  for(j in 1:ncol(r.all)){
     x = x.all[,j]
+    r = r.all[,j]
+    lambda.st = A.Y * KI.Y(Delta.Y,x, K.M=km.star)
+    lambda    = A.Y * KI.Y(Delta.Y,x,      K.M=km)
+    l.lik.st = l.lik.st + sum(log(dpois(r,lambda.st[,1])+1e-300))
+    l.lik    = l.lik    + sum(log(dpois(r,lambda[,1]   )+1e-300))
+  }
+  
+  logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
+           + pnorm(km, 0, s*b, log.p = T) - pnorm(km.star, 0, s*b, log.p = T)) 
+  
+  if(!is.nan(logMH) && runif(1)<exp(logMH)) {
+    km=km.star; count = 1;
+  }
+  alpha = min(exp(logMH),1)
+  s=ramcmc::adapt_S(s,u,alpha,rep,gamma = min(1,(1*rep)^(-2/3)))
+  return(list(km=km,s=s, count=count))
+}
+
+MH.KM.singleX <- function(km, s, rep, r.all, x, b, pri.KM, Delta.Y){
+  # km: Michaelis-Menten constant in the current iteration.
+  # s: scaling factor for tunning
+  # rep: iteration number
+  # x: X trajectory to construct the likelihood for the birth of Y. 
+  # r.all: numbers of the birth reactions of Y. Dim: maxT * (number of experiments)
+  # b: tunning parameters for KM
+  # pri.KM : prior distribution parameters for KM
+  
+  count = 0
+  repeat{
+    u = rnorm(1,0,b)
+    km.star = km + s * u
+    if(km.star > 0) break
+  }
+  
+  l.lik.st = 0;
+  l.lik = 0;
+  
+  for(j in 1:ncol(r.all)){
     r = r.all[,j]
     lambda.st = A.Y * KI.Y(Delta.Y,x, K.M=km.star)
     lambda    = A.Y * KI.Y(Delta.Y,x,      K.M=km)
