@@ -167,7 +167,7 @@ for (rep in 1:nrepeat) {
   theta[rep,1] =theta.X[1]
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
-  p.update <- MH.P.X(Delta.X, Delta.X.S, rep, RR[,3:4], theta.X[1], maxt = max.T)
+  p.update <- MH.P.X(Delta.X, Delta.X.S, rep, RR[,3], Ax = theta.X[1], pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
   Delta.X = p.update$P
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
@@ -176,7 +176,7 @@ for (rep in 1:nrepeat) {
   theta[rep,3:4]=Delta.X
 
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM(theta.Y[3] , KM.S, rep, RR[,1], X)
+  KM.update = MH.KM(theta.Y[3] , KM.S, rep, RR[,1], X, b = tun.KM, pri.KM = pri.KM)
   theta.Y[3] = KM.update$km;
   K.M=theta.Y[3];
   KM.S = KM.update$s
