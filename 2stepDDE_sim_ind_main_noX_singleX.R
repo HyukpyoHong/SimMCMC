@@ -20,7 +20,7 @@ K.M <- 200;
 
 max.T <- 25 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
-nsample <- 2;
+nsample <- 4;
 
 birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of X
 deathX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of X
@@ -174,7 +174,7 @@ for(rep in 2:nrepeat) {
   theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
-  p.update <- MH.P.X.all(P = theta[rep-1,3:4], Delta.X.S, rep, RR.all[,3,], Ax = theta[rep-1,1],  tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
+  p.update <- MH.P.X(P = theta[rep-1,3:4], Delta.X.S, rep, RR.all[,3,1], Ax = theta[rep-1,1],  tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
   theta[rep,3:4] = p.update$P
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
@@ -182,12 +182,12 @@ for(rep in 2:nrepeat) {
   K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
   
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM)
+  KM.update = MH.KM.singleX(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y)
   theta[rep,2] = KM.update$km;
   KM.S = KM.update$s
   count_KM = count_KM + KM.update$count
   
-  X.fit[rep,,] = X.all
+  X.fit[rep,] = X
   R.fit[4*rep-3,,] = RR.all[,1,] # birth number of Y
   R.fit[4*rep-2,,] = RR.all[,2,] # death number of Y
   R.fit[4*rep-1,,] = RR.all[,3,] # birth number of X
@@ -223,7 +223,7 @@ colMeans(theta)
 # plot(colMeans(birthY)); lines(birthY.sim);
 
 result.par <- theta[selrow,]
-result.X.trj <- X.fit[selrow,,]
+result.X.trj <- X.fit[selrow,]
 # result.etc <- matrix(data= 0, nrow = max.T + 1, ncol = 4)
 # result.etc[,1] <- sim.X; result.etc[,2] <- sim.Y; result.etc[1,3] <- rndseed; 
 # result.etc[1,4] <- count_X / nrepeat; result.etc[2,4] <- count_Delta.X / nrepeat; result.etc[3,4] <- count_KM / nrepeat;  
