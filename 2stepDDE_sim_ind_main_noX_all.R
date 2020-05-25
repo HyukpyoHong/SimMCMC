@@ -108,7 +108,7 @@ for(jj in 1:nsample){
 ################################################
 
 # matrix & vector for saving MCMC results
-count_KM <- 0; count_X <- 0; count_Delta.X <- 0;
+count_KM <- 0; count_X <- rep(0, nsample); count_Delta.X <- 0;
 
 theta <- matrix(0,nrow = nrepeat, ncol=4)
 X.fit <- array(0, dim = c(nrepeat, max.T+1, nsample))
@@ -132,12 +132,6 @@ ptnum <- 4;
 useall <- TRUE;
 theta[1,] = c(theta.X[1], theta.Y[3], Delta.X[1], Delta.X[2])
 
-X.all.star <- X.all
-X.bir.st <- matrix(0, nrow = max.T, ncol = nsample)
-X.dea.st <- matrix(0, nrow = max.T, ncol = nsample)
-
-q.Y.st <- 0; q.Y <- 0;
-
 for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
   for(jj in 1:nsample){
@@ -149,30 +143,29 @@ for(rep in 2:nrepeat) {
   # generate a proposal mean trajectory using the current parameter set.
   for(jj in 1:nsample){
     myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*500), maxT = max.T+5)
-    X.bir.st[,jj] <- myListX$Xbirth[1:max.T]
-    X.dea.st[,jj] <- myListX$Xdeath[1:max.T]
-    X.all.star[,jj] <- c(0, cumsum(X.bir.st[,jj] - X.dea.st[,jj]));
+    X.bir.st <- myListX$Xbirth[1:max.T]
+    X.dea.st <- myListX$Xdeath[1:max.T]
+    X.star <- c(0, cumsum(X.bir.st - X.dea.st));
     # print(X.update$errflg)
     if (useall == TRUE){
-      fy.st = A.Y * KI.Y(Delta.Y,in.X = X.all.star[,jj], K.M=theta[rep-1,2])
+      fy.st = A.Y * KI.Y(Delta.Y,in.X = X.star, K.M=theta[rep-1,2])
       fy    = A.Y * KI.Y(Delta.Y,in.X = X.all[,jj]     , K.M=theta[rep-1,2])
     }else{
-      fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.all.star[,jj], N = ptnum, K.M=theta[rep-1,2])
+      fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
       fy    = A.Y * KI.Ynt(Delta.Y,in.X = X.all[,jj]     , N = ptnum, K.M=theta[rep-1,2])
     }
-    q.Y.st = q.Y.st + sum(log(dpois(RR.all[,1,jj],fy.st[,1])+1e-300), na.rm = T)
-    q.Y    = q.Y + sum(log(dpois(RR.all[,1,jj],fy[,1]   )+1e-300), na.rm = T)
+    q.Y.st = sum(log(dpois(RR.all[,1,jj],fy.st[,1])+1e-300), na.rm = T)
+    q.Y    = sum(log(dpois(RR.all[,1,jj],fy[,1]   )+1e-300), na.rm = T)
     
-  }
-  
-  prior.X.st = sum(log(dgamma(X.all.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
-  prior.X   = sum(log(dgamma(X.all, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
-  
-  logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
-  # print(logMH);
-  if(!is.nan(logMH) && runif(1)<exp(logMH)){
-    X.all=X.all.star; RR.all[,3,] <- X.bir.st; RR.all[,4,] <- X.dea.st;
-    count_X = count_X + 1; 
+    prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+    prior.X   = sum(log(dgamma(X.all[,jj], shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+    
+    logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+    # print(logMH);
+    if(!is.nan(logMH) && runif(1)<exp(logMH)){
+      X.all[,jj] <- X.star; RR.all[,3,jj] <- X.bir.st; RR.all[,4,jj] <- X.dea.st;
+      count_X[jj] = count_X[jj] + 1;
+    }
   }
   
   # step  4: samping A.X 
