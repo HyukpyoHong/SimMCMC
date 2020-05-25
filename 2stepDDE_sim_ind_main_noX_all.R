@@ -181,7 +181,7 @@ for(rep in 2:nrepeat) {
   K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
   
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM)
+  KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y)
   theta[rep,2] = KM.update$km;
   KM.S = KM.update$s
   count_KM = count_KM + KM.update$count
