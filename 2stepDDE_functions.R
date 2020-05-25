@@ -597,27 +597,27 @@ KI.Ynt <-function(P=Delta.X,in.X, N = 4, K.M){
 # refering Vihola(2012), Statistics and Computing, 22(5):997-1008. 
 # using informative gamma prior for beta
 
-MH.P.X <- function(P,S,rep, Ri, A, tun = tun.Delta.X, maxt) {
+MH.P.X <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt){
   count = 0
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
     P.star = P + S%*%u
-    if(P.star[1]>1 && P.star[2]>0)  break
+    if(P.star[1]>1 && P.star[2]>0){
+      break
+    }
   }
   
   KI.star <- KI(P.star, maxt = maxt)      # calculating kappa using current alpha & candidate of beta
   KI.m <- KI(P, maxt = maxt)              # calculating kappa using current alpha & beta
-  l.lik.st <- 0
-  l.lik <- 0
-  for (i in 1:1) {
-    Rii <- Ri[, 1]
-    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - A * (sum(KI.star))
-    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - A * (sum(KI.m))
-  }
+  
+  l.lik.st <- sum(r.X.birth * log(KI.star), na.rm = T) - Ax * (sum(KI.star))
+  l.lik <- sum(r.X.birth * log(KI.m), na.rm = T) - Ax * (sum(KI.m))
+  
   l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
+  
   logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
             + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
             - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
@@ -632,28 +632,33 @@ MH.P.X <- function(P,S,rep, Ri, A, tun = tun.Delta.X, maxt) {
   return(list(P=P, S=S.update, count=count))
 } 
 
-MH.P.X.all <- function(P,S,rep, Ri, A, tun, maxt) {
+MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt) {
   count = 0
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
     P.star = P + S%*%u
-    if(min(P.star)>0)  break
+    if(P.star[1]>1 && P.star[2]>0){
+      break
+    }
   }
-  
   KI.star <- KI(P.star, maxt = maxt)      # calculating kappa using current alpha & candidate of beta
   KI.m <- KI(P, maxt = maxt)              # calculating kappa using current alpha & beta
   l.lik.st <- 0
   l.lik <- 0
-  for (i in 1:dim(Ri)[3]){
-    Rii <- Ri[, 1, i]
-    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - A * (sum(KI.star))
-    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - A * (sum(KI.m))
+  
+  for (i in 1:ncol(r.X.birth)){
+    Rii <- r.X.birth[, i]
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax * (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax * (sum(KI.m))
   }
   l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
-  logMH <- l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2  
+  logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+            + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+            - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  
   alpha = min (exp(logMH),1)
   if(!is.nan(alpha) && runif(1)<alpha){
     P <- P.star;count = 1;
@@ -1079,7 +1084,14 @@ MH.XR.ind <-function(r,x,kix,km, thetax, m = mean.x, bi=tun.X, ptnum = 4, useall
 # refering Vihola(2012), Statistics and Computing, 22(5):997-1008. 
 # using informative gamma prior for beta
 
-MH.KM <- function(km, s, rep, r, x, b=tun.KM){
+MH.KM <- function(km, s, rep, r, x, b, pri.KM){
+  # km: Michaelis-Menten constant in the current iteration.
+  # s: scaling factor for tunning
+  # rep: iteration number
+  # x: X trajectories to construct the likelihood for the birth of Y 
+  # b: tunning parameters for KM
+  # pri.KM : prior distribution parameters for KM
+  
   count = 0
   repeat{
     u = rnorm(1,0,b)
@@ -1105,7 +1117,15 @@ MH.KM <- function(km, s, rep, r, x, b=tun.KM){
 }
 
 
-MH.KM.all <- function(km, s, rep, r.all, x.all, b=tun.KM){
+MH.KM.all <- function(km, s, rep, r.all, x.all, b, pri.KM){
+  # km: Michaelis-Menten constant in the current iteration.
+  # s: scaling factor for tunning
+  # rep: iteration number
+  # x.all: X trajectories to construct the likelihood for the birth of Y. Dim: (maxT + 1) * (number of experiments)
+  # r.all: numbers of the birth reactions of Y. Dim: maxT * (number of experiments)
+  # b: tunning parameters for KM
+  # pri.KM : prior distribution parameters for KM
+  
   count = 0
   repeat{
     u = rnorm(1,0,b)
@@ -1113,7 +1133,6 @@ MH.KM.all <- function(km, s, rep, r.all, x.all, b=tun.KM){
     if(km.star > 0) break
   }
   
-  len = nrow(x.all)
   l.lik.st = 0;
   l.lik = 0;
   
@@ -1128,6 +1147,7 @@ MH.KM.all <- function(km, s, rep, r.all, x.all, b=tun.KM){
   
   logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
            + pnorm(km, 0, s*b, log.p = T) - pnorm(km.star, 0, s*b, log.p = T)) 
+  
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
     km=km.star; count = 1;
   }
