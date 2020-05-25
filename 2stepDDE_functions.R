@@ -602,7 +602,9 @@ MH.P.X <- function(P,S,rep, Ri, A, tun = tun.Delta.X, maxt) {
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
     P.star = P + S%*%u
-    if(P.star[1]>1 && P.star[2]>0)  break
+    if(P.star[1]>1 && P.star[2]>0){
+      break
+    }
   }
   
   KI.star <- KI(P.star, maxt = maxt)      # calculating kappa using current alpha & candidate of beta
