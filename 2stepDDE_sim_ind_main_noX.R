@@ -18,7 +18,7 @@ alpha.Y <- 3.6; beta.Y <- 0.6*int;
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
 K.M <- 200; 
 
-max.T <- 25 # simulated data will be given from t = 0, ..., max.T
+max.T <- 50 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
 
 # myList is raw simulated data. 
@@ -71,7 +71,7 @@ pri.KM <- c(200* 0.01, 0.01); # non-informative prior for KM
 
 tun.KM =1; tun.Delta.X = c(1.0, 1);
 
-effrepeat <- 3000
+effrepeat <- 5000
 burn <- 0; thin <- 1
 nrepeat <- burn + thin*effrepeat
 
@@ -126,7 +126,7 @@ ptnum <- 4
 useall <- TRUE
 
 theta[1,] = c(theta.X[1], theta.Y[3], Delta.X[1], Delta.X[2])
-for(rep in 1:nrepeat) {
+for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
   RR[,1:2] <- impute_r.Y(Y, B.Y = B.Y)
   
@@ -134,17 +134,17 @@ for(rep in 1:nrepeat) {
   # updating X using independent chain MH
   
   # generate a proposal mean trajectory using the current parameter set.
-  myListX <- TimeDelayGillespieforXR(A.X = theta[rep,1], B.X = B.X, alpha.X = theta[rep,3], beta.X = theta[rep,4], repnum = round(max.T*500), maxT = max.T+5)
+  myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*500), maxT = max.T+5)
   X.bir.st <- myListX$Xbirth[1:max.T]
   X.dea.st <- myListX$Xdeath[1:max.T]
   X.star <- c(0, cumsum(X.bir.st - X.dea.st));
   # print(X.update$errflg)
   if (useall == TRUE){
-    fy.st = A.Y * KI.Y(Delta.Y,in.X = X.star, K.M=theta[rep,2])
-    fy    = A.Y * KI.Y(Delta.Y,in.X = X     , K.M=theta[rep,2])
+    fy.st = A.Y * KI.Y(Delta.Y,in.X = X.star, K.M=theta[rep-1,2])
+    fy    = A.Y * KI.Y(Delta.Y,in.X = X     , K.M=theta[rep-1,2])
   }else{
-    fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep,2])
-    fy    = A.Y * KI.Ynt(Delta.Y,in.X = X     , N = ptnum, K.M=theta[rep,2])
+    fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
+    fy    = A.Y * KI.Ynt(Delta.Y,in.X = X     , N = ptnum, K.M=theta[rep-1,2])
   }
   q.Y.st = sum(log(dpois(RR[,1],fy.st[,1])+1e-300), na.rm = T)
   q.Y    = sum(log(dpois(RR[,1],fy[,1]   )+1e-300), na.rm = T)
@@ -163,7 +163,7 @@ for(rep in 1:nrepeat) {
   theta[rep,1] = rgamma(1,shape = sum(RR[,3]) + pri.A.X[1], rate = g_11 + pri.A.X[2]);
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
-  p.update <- MH.P.X(P = theta[rep,3:4], Delta.X.S, rep, RR[,3], Ax = theta[rep,1], tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
+  p.update <- MH.P.X(P = theta[rep-1,3:4], Delta.X.S, rep, RR[,3], Ax = theta[rep,1], tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
   theta[rep,3:4] = p.update$P
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
@@ -171,7 +171,7 @@ for(rep in 1:nrepeat) {
   K.i <- KI(P = theta[rep,3:4], maxt = max.T);
   
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM(theta[rep,2] , KM.S, rep, RR[,1], X, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y)
+  KM.update = MH.KM(theta[rep-1,2] , KM.S, rep, RR[,1], X, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y)
   theta[rep,2] = KM.update$km;
   KM.S = KM.update$s
   count_KM = count_KM + KM.update$count
