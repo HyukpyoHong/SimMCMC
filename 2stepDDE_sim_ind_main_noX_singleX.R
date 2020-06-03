@@ -20,7 +20,7 @@ K.M <- 200;
 
 max.T <- 25 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
-nsample <- 4;
+nsample <- 20;
 
 birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of X
 deathX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of X
@@ -69,15 +69,15 @@ tmp <- seq(from=0.1, by=1, length.out = max.T+1) # tunning parameter for the set
 tun.X <- seq(from=0.1, by=0.03, length.out = max.T+1)
 # plot(tun.X)
 
-pri.A.X <- c(10 * 0.01, 0.01); # non-informative prior for A.X
-pri.alpha.X <- c(3.6 * 0.1, 0.1); # inormative prior for alpha.X
-pri.beta.X <- c(0.01, 0.01); # inormative prior for beta.X
-pri.KM <- c(200* 0.01, 0.01); # non-informative prior for KM
+pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
+pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
+pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
+pri.KM <- c(1, 0.001); # non-informative prior for KM
 
 tun.KM <- 1; 
 tun.Delta.X <- c(1.0, 1);
 
-effrepeat <- 500
+effrepeat <- 1000
 burn <- 0; thin <- 1;
 nrepeat <- burn + thin*effrepeat;
 
@@ -133,6 +133,7 @@ ptnum <- 4;
 useall <- TRUE;
 theta[1,] = c(theta.X[1], theta.Y[3], Delta.X[1], Delta.X[2])
 q.Y.st <- 0; q.Y <- 0;
+RR.all[,3,] <- birthX.sim
 
 for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
@@ -162,7 +163,10 @@ for(rep in 2:nrepeat) {
   }
   prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   prior.X   = sum(log(dgamma(X, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
-  logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+  
+  # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
+  logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
+  
   # print(logMH);
   if(!is.nan(logMH) && runif(1)<exp(logMH)){
     X <- X.star; RR.all[,3,] <- X.bir.st; RR.all[,4,] <- X.dea.st;
@@ -268,10 +272,7 @@ plot(theta[,1], type = "l")
 plot(theta[,2], type = "l")
 plot(theta[,1]/theta[,2], type = "l")
 plot(theta[,3], type = "l")
-plot(theta[,3]/theta[,4], type = "l")
-mean(theta[1:2500,3]/theta[1:2500,4])
-mean(theta[1:2500,3])
-mean(theta[1:2500,4])
-plot(theta[,3]/theta[,4]^2, type = "l")
 plot(theta[,4], type = "l")
+plot(theta[,3]/theta[,4], type = "l")
+plot(theta[,3]/theta[,4]^2, type = "l")
 

@@ -16,7 +16,7 @@ alpha.Y <- 3.6; beta.Y <- 0.6*int;
 
 # unknowns parameters
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
-K.M <- 200; 
+K.M <- 200;
 
 max.T <- 50 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
@@ -58,20 +58,21 @@ for(i in 1:length(ceiling(myList$TList))){
 Y <- sim.Y
 X <- sim.X
 
+
 tun.B <- c(50,50, 100, 100);
 tmp <- seq(from=0.1, by=1, length.out = max.T+1) # tunning parameter for the setting 1.
 # tun.X <- 8 * tmp^2 / (600 + tmp^2) + 0.3
 tun.X <- seq(from=0.1, by=0.03, length.out = max.T+1)
 # plot(tun.X)
 
-pri.A.X <- c(10 * 0.01, 0.01); # non-informative prior for A.X
-pri.alpha.X <- c(3.6 * 0.1, 0.1); # inormative prior for alpha.X
-pri.beta.X <- c(0.01, 0.01); # inormative prior for beta.X
-pri.KM <- c(200* 0.01, 0.01); # non-informative prior for KM
+pri.A.X <- c(10, 1); # non-informative prior for A.X
+pri.alpha.X <- c(5, 1); # inormative prior for alpha.X
+pri.beta.X <- c(1, 1); # inormative prior for beta.X
+pri.KM <- c(1, 0.001); # non-informative prior for KM
 
 tun.KM =1; tun.Delta.X = c(1.0, 1);
 
-effrepeat <- 5000
+effrepeat <- 100
 burn <- 0; thin <- 1
 nrepeat <- burn + thin*effrepeat
 
@@ -126,7 +127,9 @@ ptnum <- 4
 useall <- TRUE
 
 theta[1,] = c(theta.X[1], theta.Y[3], Delta.X[1], Delta.X[2])
-for(rep in 2:nrepeat) {
+RR[,3] <- birthX.sim
+
+for(rep in 2:nrepeat){
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
   RR[,1:2] <- impute_r.Y(Y, B.Y = B.Y)
   
@@ -146,12 +149,14 @@ for(rep in 2:nrepeat) {
     fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
     fy    = A.Y * KI.Ynt(Delta.Y,in.X = X     , N = ptnum, K.M=theta[rep-1,2])
   }
+  
   q.Y.st = sum(log(dpois(RR[,1],fy.st[,1])+1e-300), na.rm = T)
   q.Y    = sum(log(dpois(RR[,1],fy[,1]   )+1e-300), na.rm = T)
   prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   prior.X   = sum(log(dgamma(X, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   
-  logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+  # logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+  logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X
   # print(logMH);
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
     X=X.star; RR[,3] <- X.bir.st; RR[,4] <- X.dea.st;
@@ -160,7 +165,10 @@ for(rep in 2:nrepeat) {
   
   # step  4: samping A.X 
   g_11 <- sum(K.i);
-  theta[rep,1] = rgamma(1,shape = sum(RR[,3]) + pri.A.X[1], rate = g_11 + pri.A.X[2]);
+  theta[rep,1] = rgamma(1,shape = sum(RR[,3]) + pri.A.X[1], rate = g_11 + pri.A.X[2]); #considering prior
+  # theta[rep,1] = rgamma(1,shape = sum(RR[,3]), rate = g_11); # Completely non-informative, i.e., always prior.X.st == prior.X 
+  
+  # theta[rep,1] = A.X;
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
   p.update <- MH.P.X(P = theta[rep-1,3:4], Delta.X.S, rep, RR[,3], Ax = theta[rep,1], tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
@@ -184,6 +192,10 @@ for(rep in 2:nrepeat) {
   
   # S.fit[rep,] = as.vector(Delta.X.S)
   if(rep%%1000 ==0 ) cat("0")
+  if(theta[rep,1] > 300){
+    print("Estimated Ax > 300")
+    break
+  }
 }
 
 # the estimated reaction numbers from MCMC algorithm.
@@ -199,6 +211,7 @@ print(paste0("Acceptance ratio for K.M: ", count_KM / nrepeat))  # Acceptance ra
 # generate a Y trajectory from the mean of the estimated parameters from the effective iteration indexed by 'selrow'.
 gen.num <- 10
 gen.y2 <- matrix(0, nrow = gen.num, ncol = max.T+1)
+selrow <- 1:500
 for(jj in 1:gen.num){
   myList2 <- TimeDelayGillespieforXY(A.X = colMeans(theta[selrow,])[1], B.X = 0.05, alpha.X = colMeans(theta[selrow,])[3], beta.X = colMeans(theta[selrow,])[4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = colMeans(theta[selrow,])[2], repnum = max.T*500, maxT = max.T+3)
   sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
@@ -215,8 +228,6 @@ result.X.trj <- X.fit[selrow,]
 result.etc <- matrix(data= 0, nrow = max.T + 1, ncol = 4)
 result.etc[,1] <- sim.X; result.etc[,2] <- sim.Y; result.etc[1,3] <- rndseed; 
 result.etc[1,4] <- count_X / nrepeat; result.etc[2,4] <- count_Delta.X / nrepeat; result.etc[3,4] <- count_KM / nrepeat;  
-plot(tspan, sim.X/200);   
-
 
 currentT <- Sys.time()
 timestamp <- paste(substr(currentT, 1,4), substr(currentT, 6,7), substr(currentT, 9,10),substr(currentT, 12,13), substr(currentT, 15,16), substr(currentT, 18,19), sep = "")
@@ -233,38 +244,100 @@ etc.filename <- paste("Etc_maxT", toString(max.T), "_",  toString(timestamp), ".
 # write.table(result.etc, paste(compath, etc.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
 
 ### print result ###
-
-plot(A.Y * KI.Y(Delta.Y, in.X = colMeans(result.X.trj), K.M = mean(theta[,2]))[,1])
-lines(birthY.sim)
+plot(birthY.sim)
+lines(A.Y * KI.Y(Delta.Y, in.X = colMeans(X.fit[selrow,]), K.M = mean(theta[selrow,2]))[,1])
 plot(tspan, sim.Y)
 lines(tspan, mean.y, col = "red")
 
 # gen.y3 <- matrix(0, nrow = effrepeat, ncol = max.T+1)
-# for(jj in 1:effrepeat){
-#   myList2 <- TimeDelayGillespieforXY(A.X = theta[selrow[jj],1], B.X = 0.05, alpha.X = theta[selrow[jj],3], beta.X = theta[selrow[jj],4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = theta[selrow[jj],2], repnum = max.T*500, maxT = max.T+3)
-#   sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
-#   gen.y3[jj,] <- approx(myList2$TList[!is.na(myList2$TList)], myList2$YList[!is.na(myList2$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$YList[!is.na(myList2$YList)]))$y
-#   if(rep%%1000 ==0 ) cat("0")
+# for(jj in 3001:3500){
+#    myList2 <- TimeDelayGillespieforXY(A.X = theta[selrow[jj],1], B.X = 0.05, alpha.X = theta[selrow[jj],3], beta.X = theta[selrow[jj],4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = theta[selrow[jj],2], repnum = max.T*500, maxT = max.T+3)
+#    sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
+#    gen.y3[jj,] <- approx(myList2$TList[!is.na(myList2$TList)], myList2$YList[!is.na(myList2$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$YList[!is.na(myList2$YList)]))$y
+#   if(jj%%100 ==0 ) cat("0")
 # }
-# mean.y2 <- colMeans(gen.y3)
+# mean.y2 <- colMeans(gen.y3[3001:3500,])
+# 
+# plot(tspan, sim.Y); 
+# for(jj in seq(from = 3100, to = 3200, by = 5)){
+#   lines(tspan, gen.y3[jj,], col = "red")
+# }
+# lines(tspan, mean.y2, col = "red")
+# 
+# 
+# plot(birthY.sim)
+# for(jj in seq(from = 3100, to = 3200, by = 5)){
+#   lines(A.Y * KI.Y(Delta.Y, in.X = X.fit[jj,], K.M = theta[jj,2])[,1])
+# }
+# X.fit[3250,]
+# theta[3250,]
+  
 
-# tmp <- 1177
-# lines(tspan, gen.y3[tmp,], col = "blue")
-# theta[tmp,]
+plot(X.fit[,22])
+idx1 <- 20; idx2 <- 3200
+if (useall == TRUE){
+  fy.st = A.Y * KI.Y(Delta.Y,in.X = X.fit[idx2,], K.M=theta[idx2,2])
+  fy    = A.Y * KI.Y(Delta.Y,in.X = X.fit[idx1,], K.M=theta[idx1,2])
+}else{
+  fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.fit[idx2,], N = ptnum, K.M=theta[idx2,2])
+  fy    = A.Y * KI.Ynt(Delta.Y,in.X = X.fit[idx1,], N = ptnum, K.M=theta[idx1,2])
+}
+q.Y.st = sum(log(dpois(birthY[idx2,],fy.st[,1])+1e-300), na.rm = T)
+q.Y    = sum(log(dpois(birthY[idx1,],fy[,1]   )+1e-300), na.rm = T)
+prior.X.st = sum(log(dgamma(X.fit[idx2,] , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+prior.X   = sum(log(dgamma(X.fit[idx1,], shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
 
-colMeans(theta)
+logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+logMH
+q.Y.st
+q.Y
+prior.X.st
+prior.X
+
+colMeans(theta[2000:30000,])
+mean(theta[2000:30000,3]/theta[,4]^2)
 
 plot(theta[,1], type = "l")
 plot(theta[,2], type = "l")
 plot(theta[,1]/theta[,2], type = "l")
 plot(theta[,3], type = "l")
-plot(theta[,3]/theta[,4], type = "l")
-mean(theta[1:2500,3]/theta[1:2500,4])
-mean(theta[1:2500,3])
-mean(theta[1:2500,4])
-plot(theta[,3]/theta[,4]^2, type = "l")
 plot(theta[,4], type = "l")
+plot(theta[,3]/theta[,4], type = "l")
+plot(theta[,3]/theta[,4]^2, type = "l")
 
-
-
+# 
+# P.star <- c(900, 250); P <- c(3.6, 0.6)
+# r.X.birth <- RR[,3]
+# r.X.birth <- birthX.sim
+# KI.star <- KI(P.star, maxt = max.T)      # calculating kappa using current alpha & candidate of beta
+# KI.m <- KI(P, maxt = max.T)              # calculating kappa using current alpha & beta
+# 
+# Ax <- A.X
+# S <- Delta.X.S; 
+# S <- matrix(data = c(1290, 257, 0, 21), nrow =2);
+# tun <- tun.Delta.X
+# 
+# l.lik.st <- sum(r.X.birth * log(KI.star), na.rm = T) - Ax * (sum(KI.star))
+# l.lik <- sum(r.X.birth * log(KI.m), na.rm = T) - Ax * (sum(KI.m))
+# 
+# l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
+# l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
+# l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
+# l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
+# 
+# logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+#           # + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+#           # - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+#           + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+#           - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+#           )
+# logMH
+# l.lik.st
+# l.lik
+# l.prior1
+# l.prior1.st
+# l.prior2.st
+# l.prior2
+# log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+# log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
 

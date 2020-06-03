@@ -602,7 +602,10 @@ MH.P.X <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt){
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
     P.star = P + S%*%u
-    if(P.star[1]>1 && P.star[2]>0){
+    # if(P.star[1]>1 && P.star[2]>0){
+    #   break
+    # }
+    if(P.star[1]>0 && P.star[2]>0){
       break
     }
   }
@@ -619,9 +622,11 @@ MH.P.X <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt){
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
   
   logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
-            + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-            - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
-  
+            # + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+            # - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+            + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+            - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  # print(S)
   alpha = min (exp(logMH),1)
   if(!is.nan(alpha) && runif(1)<alpha){
     P <- P.star;count = 1;
@@ -637,7 +642,10 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
     P.star = P + S%*%u
-    if(P.star[1]>1 && P.star[2]>0){
+    # if(P.star[1]>1 && P.star[2]>0){
+    #   break
+    # }
+    if(P.star[1]>0 && P.star[2]>0){
       break
     }
   }
@@ -655,10 +663,11 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
-  logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
-            + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-            - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
-  
+  logMH <- (l.lik.st - l.lik  + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+            # + log(pmvnorm(upper = c(P[1] - 1,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+            # - log(pmvnorm(upper = c(P.star[1] - 1,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+            + log(pmvnorm(upper = c(P[1],P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+            - log(pmvnorm(upper = c(P.star[1],P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   alpha = min (exp(logMH),1)
   if(!is.nan(alpha) && runif(1)<alpha){
     P <- P.star;count = 1;
@@ -1089,6 +1098,7 @@ MH.KM <- function(km, s, rep, r, x, b, pri.KM, Delta.Y){
   # s: scaling factor for tunning
   # rep: iteration number
   # x: X trajectory to construct the likelihood for the birth of Y 
+  # r: number of the birth reactions of Y
   # b: tunning parameters for KM
   # pri.KM : prior distribution parameters for KM
   
@@ -1106,7 +1116,7 @@ MH.KM <- function(km, s, rep, r, x, b, pri.KM, Delta.Y){
   lambda    = A.Y * KI.Y(Delta.Y,x     , K.M=km)
   l.lik.st = sum(log(dpois(r,lambda.st[,1])+1e-300))
   l.lik    = sum(log(dpois(r,lambda[,1])+1e-300))
-  logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
+  logMH = (l.lik.st - l.lik #+ dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
            + pnorm(km, 0, s*b, log.p = T) - pnorm(km.star, 0, s*b, log.p = T))
   if(!is.nan(logMH) && runif(1)<exp(logMH)){
     km=km.star; count = 1;
@@ -1145,7 +1155,7 @@ MH.KM.all <- function(km, s, rep, r.all, x.all, b, pri.KM, Delta.Y){
     l.lik    = l.lik    + sum(log(dpois(r,lambda[,1]   )+1e-300))
   }
   
-  logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
+  logMH = (l.lik.st - l.lik # + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
            + pnorm(km, 0, s*b, log.p = T) - pnorm(km.star, 0, s*b, log.p = T)) 
   
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
@@ -1183,7 +1193,7 @@ MH.KM.singleX <- function(km, s, rep, r.all, x, b, pri.KM, Delta.Y){
     l.lik    = l.lik    + sum(log(dpois(r,lambda[,1]   )+1e-300))
   }
   
-  logMH = (l.lik.st - l.lik + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
+  logMH = (l.lik.st - l.lik  # + dgamma(km.star, pri.KM[1], pri.KM[2],log=T) - dgamma(km, pri.KM[1], pri.KM[2],log=T)
            + pnorm(km, 0, s*b, log.p = T) - pnorm(km.star, 0, s*b, log.p = T)) 
   
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
