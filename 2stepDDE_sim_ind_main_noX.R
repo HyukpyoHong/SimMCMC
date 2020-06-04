@@ -18,7 +18,7 @@ alpha.Y <- 3.6; beta.Y <- 0.6*int;
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
 K.M <- 200; 
 
-max.T <- 50 # simulated data will be given from t = 0, ..., max.T
+max.T <- 25 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
 
 # myList is raw simulated data. 
@@ -57,24 +57,44 @@ for(i in 1:length(ceiling(myList$TList))){
 
 Y <- sim.Y
 X <- sim.X
+# plot(tspan, sim.X)
+#### TEST ####
+
+# x1 <- sim.X
+# x2 <- sim.X
+# m <- x
+# bi <- tun.X
+# x.star <- x
+# for (i in 2:length(x)){
+#   x.star[i] = rgamma(1, shape = m[i]^2/bi[i]^2, rate = m[i]/bi[i]^2) # x.star: a candidate for the next X.
+# }  
+# plot(tspan, sim.X, ylim = c(0,270), type = "l")
+# lines(tspan, x.star, col = "red")
+# lines(tspan, x.star, col = "blue")
+# 
+# plot(tspan, x1, col = "blue", type = "l")
+# lines(tspan, x2, col = "red")
+
+
+
+###############
 
 tun.B <- c(50,50, 100, 100);
 tmp <- seq(from=0.1, by=1, length.out = max.T+1) # tunning parameter for the setting 1.
 # tun.X <- 8 * tmp^2 / (600 + tmp^2) + 0.3
-tun.X <- seq(from=0.1, by=0.03, length.out = max.T+1)
+tun.X <- seq(from=0.1, by=0.2, length.out = max.T+1)
 # plot(tun.X)
 
-pri.A.X <- c(10 * 0.01, 0.01); # non-informative prior for A.X
+pri.A.X <- c(10 * 1, 1); # non-informative prior for A.X
 pri.alpha.X <- c(3.6 * 0.1, 0.1); # inormative prior for alpha.X
 pri.beta.X <- c(0.01, 0.01); # inormative prior for beta.X
 pri.KM <- c(200* 0.01, 0.01); # non-informative prior for KM
 
-tun.KM =1; tun.Delta.X = c(1.0, 1);
+tun.KM = 1; tun.Delta.X = c(1.0, 1);
 
-effrepeat <- 5000
-burn <- 0; thin <- 1
+effrepeat <- 10000;
+burn <- 0; thin <- 1;
 nrepeat <- burn + thin*effrepeat
-
 selrow <- seq(from = burn + thin, by = thin, length.out = effrepeat)
 
 #initial value setting 
@@ -85,7 +105,8 @@ Delta.X <- c(alpha.X, beta.X) #initial & true values of delay parameter of X
 Delta.Y <- c(alpha.Y, beta.Y) #initial & true values of delay parameter of Y 
 
 Y.diff <- diff(Y) #y(i+1) - y(i)
-X.diff <- diff(X) #x(i+1) - x(i)    
+X.diff <- diff(X) #x(i+1) - x(i)
+
 RR <- matrix(0,ncol = 4, nrow = max.T) #saving number of reaction 
 
 for (i in 1:max.T) {
@@ -126,6 +147,8 @@ ptnum <- 4
 useall <- TRUE
 
 theta[1,] = c(theta.X[1], theta.Y[3], Delta.X[1], Delta.X[2])
+RR[,3] <- birthX.sim
+
 for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
   RR[,1:2] <- impute_r.Y(Y, B.Y = B.Y)
@@ -151,7 +174,8 @@ for(rep in 2:nrepeat) {
   prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   prior.X   = sum(log(dgamma(X, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   
-  logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+  # logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
+  logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X  
   # print(logMH);
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
     X=X.star; RR[,3] <- X.bir.st; RR[,4] <- X.dea.st;
@@ -184,6 +208,10 @@ for(rep in 2:nrepeat) {
   
   # S.fit[rep,] = as.vector(Delta.X.S)
   if(rep%%1000 ==0 ) cat("0")
+  if(theta[rep,1] > 300){
+    print("Estimated Ax > 300")
+    break
+  } 
 }
 
 # the estimated reaction numbers from MCMC algorithm.
@@ -259,12 +287,16 @@ plot(theta[,2], type = "l")
 plot(theta[,1]/theta[,2], type = "l")
 plot(theta[,3], type = "l")
 plot(theta[,3]/theta[,4], type = "l")
-mean(theta[1:2500,3]/theta[1:2500,4])
-mean(theta[1:2500,3])
-mean(theta[1:2500,4])
 plot(theta[,3]/theta[,4]^2, type = "l")
 plot(theta[,4], type = "l")
+plot(theta[,1], theta[,2])
 
+hist(theta[,1], breaks = 30)
+hist(theta[,2], breaks = 30)
+hist(theta[,1]/theta[,2], breaks = 30)
+hist(theta[,3]/theta[,4], breaks = 30)
 
+mean(theta[,1]/theta[,2])
+pairs(theta)
 
 
