@@ -18,7 +18,7 @@ alpha.Y <- 3.6; beta.Y <- 0.6*int;
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
 K.M <- 200; 
 
-max.T <- 25 # simulated data will be given from t = 0, ..., max.T
+max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
 
 # myList is raw simulated data. 
@@ -85,14 +85,14 @@ tmp <- seq(from=0.1, by=1, length.out = max.T+1) # tunning parameter for the set
 tun.X <- seq(from=0.1, by=0.2, length.out = max.T+1)
 # plot(tun.X)
 
-pri.A.X <- c(10 * 1, 1); # non-informative prior for A.X
-pri.alpha.X <- c(3.6 * 0.1, 0.1); # inormative prior for alpha.X
-pri.beta.X <- c(0.01, 0.01); # inormative prior for beta.X
-pri.KM <- c(200* 0.01, 0.01); # non-informative prior for KM
+pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
+pri.alpha.X <- c(0.001 , 0.001); # inormative prior for alpha.X
+pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
+# pri.KM <- c(200* 0.01, 0.01); # non-informative prior for KM
 
 tun.KM = 1; tun.Delta.X = c(1.0, 1);
 
-effrepeat <- 10000;
+effrepeat <- 1000;
 burn <- 0; thin <- 1;
 nrepeat <- burn + thin*effrepeat
 selrow <- seq(from = burn + thin, by = thin, length.out = effrepeat)
@@ -142,13 +142,15 @@ AcceptR.star.fit <- matrix(0,nrow = nrepeat, ncol = 5)
 
 KM.lik.fit <- rep(0, nrepeat)
 KM.star.lik.fit <- rep(0, nrepeat)
+H0.X.st = matrix(0, ncol=2,nrow = max.T)
+H0.X    = matrix(0, ncol=2,nrow = max.T)
 
 ptnum <- 4
 useall <- TRUE
 
 theta[1,] = c(theta.X[1], theta.Y[3], Delta.X[1], Delta.X[2])
 RR[,3] <- birthX.sim
-
+RR[,4] <- deathX.sim
 for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
   RR[,1:2] <- impute_r.Y(Y, B.Y = B.Y)
@@ -157,6 +159,8 @@ for(rep in 2:nrepeat) {
   # updating X using independent chain MH
   
   # generate a proposal mean trajectory using the current parameter set.
+  K.i <- KI(theta[rep-1,3:4], maxt = max.T);
+  
   myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*500), maxT = max.T+5)
   X.bir.st <- myListX$Xbirth[1:max.T]
   X.dea.st <- myListX$Xdeath[1:max.T]
@@ -169,13 +173,19 @@ for(rep in 2:nrepeat) {
     fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
     fy    = A.Y * KI.Ynt(Delta.Y,in.X = X     , N = ptnum, K.M=theta[rep-1,2])
   }
+  for (i in 1:max.T){
+    H0.X.st[i,] = (H.X(X.star[i], K.i[i], c(theta[rep-1,1],B.X))+H.X(X.star[i+1], K.i[i], c(theta[rep-1,1],B.X)))/2
+    H0.X[i,]    = (H.X(X[i]     , K.i[i], c(theta[rep-1,1],B.X))+H.X(X[i+1]     , K.i[i], c(theta[rep-1,1],B.X)))/2
+    #H0.X = (birth propensity of X, death propensity of X) at time i.
+  }
+  
   q.Y.st = sum(log(dpois(RR[,1],fy.st[,1])+1e-300), na.rm = T)
   q.Y    = sum(log(dpois(RR[,1],fy[,1]   )+1e-300), na.rm = T)
   prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   prior.X   = sum(log(dgamma(X, shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
   
   # logMH <- q.Y.st - q.Y + prior.X.st - prior.X;
-  logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X  
+  logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X
   # print(logMH);
   if(!is.nan(logMH) && runif(1)<exp(logMH)) {
     X=X.star; RR[,3] <- X.bir.st; RR[,4] <- X.dea.st;
@@ -187,15 +197,13 @@ for(rep in 2:nrepeat) {
   theta[rep,1] = rgamma(1,shape = sum(RR[,3]) + pri.A.X[1], rate = g_11 + pri.A.X[2]);
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
-  p.update <- MH.P.X(P = theta[rep-1,3:4], Delta.X.S, rep, RR[,3], Ax = theta[rep,1], tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
+  p.update <- MH.P.X(P = theta[rep-1,3:4], Delta.X.S, rep, RR[,3], Ax = theta[rep,1], tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T, flatpri = FALSE)
   theta[rep,3:4] = p.update$P
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
   
-  K.i <- KI(P = theta[rep,3:4], maxt = max.T);
-  
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM(theta[rep-1,2] , KM.S, rep, RR[,1], X, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y)
+  KM.update = MH.KM(theta[rep-1,2] , KM.S, rep, RR[,1], X, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y, flatpri = TRUE)
   theta[rep,2] = KM.update$km;
   KM.S = KM.update$s
   count_KM = count_KM + KM.update$count
@@ -249,17 +257,6 @@ plot(tspan, sim.X/200);
 currentT <- Sys.time()
 timestamp <- paste(substr(currentT, 1,4), substr(currentT, 6,7), substr(currentT, 9,10),substr(currentT, 12,13), substr(currentT, 15,16), substr(currentT, 18,19), sep = "")
 
-# compath <- "D:/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/ProfChoi_Code_20200326//";
-compath <- "/home/users/hphong/TimeDelay//";
-
-par.X.filename <- paste("Parameters_maxT", toString(max.T), "_", toString(timestamp), ".csv", sep = "")
-X.trj.filename <- paste("Xtrj_maxT", toString(max.T), "_",  toString(timestamp), ".csv", sep = "")
-etc.filename <- paste("Etc_maxT", toString(max.T), "_",  toString(timestamp), ".csv", sep = "")
-
-# write.table(result.par, paste(compath, par.X.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
-# write.table(result.X.trj, paste(compath, X.trj.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
-# write.table(result.etc, paste(compath, etc.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
-
 ### print result ###
 
 plot(A.Y * KI.Y(Delta.Y, in.X = colMeans(result.X.trj), K.M = mean(theta[,2]))[,1])
@@ -282,21 +279,18 @@ lines(tspan, mean.y, col = "red")
 
 colMeans(theta)
 
-plot(theta[,1], type = "l")
-plot(theta[,2], type = "l")
-plot(theta[,1]/theta[,2], type = "l")
-plot(theta[,3], type = "l")
-plot(theta[,3]/theta[,4], type = "l")
-plot(theta[,3]/theta[,4]^2, type = "l")
-plot(theta[,4], type = "l")
+plot(theta[,1], type = "l", xlab = "iteration", ylab = "AX")
+plot(theta[,2], type = "l", xlab = "iteration", ylab = "KM")
+plot(theta[,1]/theta[,2], type = "l", xlab = "iteration", ylab = "AX/KM")
+plot(theta[,3], type = "l", xlab = "iteration", ylab = "alphaX")
+plot(theta[,3]/theta[,4], type = "l", xlab = "iteration", ylab = "Mean Delay")
+plot(theta[,3]/theta[,4]^2, type = "l", xlab = "iteration", ylab = "Var. Delay")
+plot(theta[,4], type = "l", xlab = "iteration", ylab = "betaX") 
 plot(theta[,1], theta[,2])
+# mean(theta[,3]/theta[,4])
 
-hist(theta[,1], breaks = 30)
-hist(theta[,2], breaks = 30)
-hist(theta[,1]/theta[,2], breaks = 30)
-hist(theta[,3]/theta[,4], breaks = 30)
-
-mean(theta[,1]/theta[,2])
-pairs(theta)
-
+# hist(theta[,1], breaks = 30)
+# hist(theta[,2], breaks = 30)
+# hist(theta[,1]/theta[,2], breaks = 30)
+# hist(theta[,3]/theta[,4], breaks = 30)
 
