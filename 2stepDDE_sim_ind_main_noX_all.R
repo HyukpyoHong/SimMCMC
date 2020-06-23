@@ -20,7 +20,7 @@ K.M <- 200;
 
 max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
-nsample <- 10;
+nsample <- 20;
 
 birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of X
 deathX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of X
@@ -61,9 +61,6 @@ for(jj in 1:nsample){
 }
 Y.all <- sim.Y.all
 X.all <- sim.X.all
-
-tun.B <- c(50,50, 100, 100);
-tmp <- seq(from=0.1, by=1, length.out = max.T+1) # tunning parameter for the setting 1.
 
 pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
 pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
@@ -130,8 +127,11 @@ for(rep in 2:nrepeat) {
   for(jj in 1:nsample){
     RR.all[,1:2,jj] <- impute_r.Y(Y.all[,jj], B.Y = B.Y)
   }
+  
   # step 3: sampling X &   r3, r4 
   # updating X using independent chain MH
+  
+  K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
   
   # generate a proposal mean trajectory using the current parameter set.
   for(jj in 1:nsample){
@@ -150,8 +150,8 @@ for(rep in 2:nrepeat) {
     q.Y.st = sum(log(dpois(RR.all[,1,jj],fy.st[,1])+1e-300), na.rm = T)
     q.Y    = sum(log(dpois(RR.all[,1,jj],fy[,1]   )+1e-300), na.rm = T)
     
-    prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
-    prior.X   = sum(log(dgamma(X.all[,jj], shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+    # prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+    # prior.X   = sum(log(dgamma(X.all[,jj], shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
     
     # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
     logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
@@ -175,7 +175,6 @@ for(rep in 2:nrepeat) {
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
   
-  K.i <- KI(P = theta[rep,3:4], maxt = max.T);
   
   # step 7: sampling the Michaelis-Menten constant K.M
   KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y, flatpri = TRUE)
@@ -218,35 +217,4 @@ for(jj in 1:gen.num){
 }
 mean.y <- colMeans(gen.y2)
 
-
-# plot(A.Y * KI.Y(Delta.Y, in.X = colMeans(result.X.trj), K.M = mean(theta[,2]))[,1])
-# lines(birthY.sim)
-plot(tspan, rowMeans(sim.Y.all))
-lines(tspan, mean.y, col = "red")
-
-# gen.y3 <- matrix(0, nrow = effrepeat, ncol = max.T+1)
-# for(jj in 1:effrepeat){
-#   myList2 <- TimeDelayGillespieforXY(A.X = theta[selrow[jj],1], B.X = 0.05, alpha.X = theta[selrow[jj],3], beta.X = theta[selrow[jj],4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = theta[selrow[jj],2], repnum = max.T*500, maxT = max.T+3)
-#   sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
-#   gen.y3[jj,] <- approx(myList2$TList[!is.na(myList2$TList)], myList2$YList[!is.na(myList2$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$YList[!is.na(myList2$YList)]))$y
-#   if(rep%%1000 ==0 ) cat("0")
-# }
-# mean.y2 <- colMeans(gen.y3)
-
-# tmp <- 1177
-# lines(tspan, gen.y3[tmp,], col = "blue")
-# theta[tmp,]
-
-colMeans(theta)
-
-plot(theta[,1], type = "l")
-plot(theta[,2], type = "l")
-plot(theta[,1]/theta[,2], type = "l")
-plot(theta[,3], type = "l")
-plot(theta[,3]/theta[,4], type = "l")
-mean(theta[1:2500,3]/theta[1:2500,4])
-mean(theta[1:2500,3])
-mean(theta[1:2500,4])
-plot(theta[,3]/theta[,4]^2, type = "l")
-plot(theta[,4], type = "l")
 
