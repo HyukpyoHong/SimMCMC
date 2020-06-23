@@ -31,7 +31,7 @@ sim.Y.all <- matrix(0, nrow = max.T+1, ncol = nsample)
 
 for(jj in 1:nsample){
   # myList is raw simulated data. 
-  myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*500, maxT = max.T+3)
+  myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3)
   
   birthX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == 1) # binary for the birth reaction of X
   deathX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == -1) # binary for the death reaction of X
@@ -135,7 +135,7 @@ for(rep in 2:nrepeat) {
   
   # generate a proposal mean trajectory using the current parameter set.
   for(jj in 1:nsample){
-    myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*500), maxT = max.T+5)
+    myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*10000), maxT = max.T+5)
     X.bir.st <- myListX$Xbirth[1:max.T]
     X.dea.st <- myListX$Xdeath[1:max.T]
     X.star <- c(0, cumsum(X.bir.st - X.dea.st));

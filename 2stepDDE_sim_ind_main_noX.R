@@ -22,7 +22,7 @@ max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
 
 # myList is raw simulated data. 
-myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*500, maxT = max.T+3)
+myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3)
 
 birthX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == 1) # binary for the birth reaction of X
 deathX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == -1) # binary for the death reaction of X
@@ -132,7 +132,7 @@ for(rep in 2:nrepeat) {
   # generate a proposal mean trajectory using the current parameter set.
   K.i <- KI(theta[rep-1,3:4], maxt = max.T);
   
-  myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*500), maxT = max.T+5)
+  myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*10000), maxT = max.T+5)
   X.bir.st <- myListX$Xbirth[1:max.T]
   X.dea.st <- myListX$Xdeath[1:max.T]
   X.star <- c(0, cumsum(X.bir.st - X.dea.st));
@@ -202,7 +202,7 @@ print(paste0("Acceptance ratio for K.M: ", count_KM / nrepeat))  # Acceptance ra
 gen.num <- 10
 gen.y2 <- matrix(0, nrow = gen.num, ncol = max.T+1)
 for(jj in 1:gen.num){
-  myList2 <- TimeDelayGillespieforXY(A.X = colMeans(theta[selrow,])[1], B.X = 0.05, alpha.X = colMeans(theta[selrow,])[3], beta.X = colMeans(theta[selrow,])[4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = colMeans(theta[selrow,])[2], repnum = max.T*500, maxT = max.T+3)
+  myList2 <- TimeDelayGillespieforXY(A.X = colMeans(theta[selrow,])[1], B.X = 0.05, alpha.X = colMeans(theta[selrow,])[3], beta.X = colMeans(theta[selrow,])[4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = colMeans(theta[selrow,])[2], repnum = max.T*10000, maxT = max.T+3)
   sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
   gen.y2[jj,] <- approx(myList2$TList[!is.na(myList2$TList)], myList2$YList[!is.na(myList2$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$YList[!is.na(myList2$YList)]))$y
 }
