@@ -201,6 +201,10 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
   YList <- rep(NA, repnum)
   currentTime <- 0
   TList <- rep(NA, repnum)
+  Xbirth <- rep(0, maxT)
+  Xdeath <- rep(0, maxT)
+  Ybirth <- rep(0, maxT)
+  Ydeath <- rep(0, maxT)
   n <- 1
   k <- 1
   stackTimeX <- c()
@@ -236,6 +240,7 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
         XList[i] <- X
         YList[i] <- Y
         TList[i] <- currentTime
+        Xdeath[ceiling(currentTime)] = Xdeath[ceiling(currentTime)] + 1
       } else if (r1 < (a1+a2+a3)/a0){
         XList[i] <- X
         YList[i] <- Y
@@ -247,6 +252,7 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
         XList[i] <- X
         YList[i] <- Y
         TList[i] <- currentTime
+        Ydeath[ceiling(currentTime)] = Ydeath[ceiling(currentTime)] + 1
       }
     } else{
       if (min(stackTimeX) < min(stackTimeY)){
@@ -256,6 +262,7 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
         TList[i] <- minStack
         currentTime <- minStack
         stackTimeX <- stackTimeX[-1]
+        Xbirth[ceiling(currentTime)] = Xbirth[ceiling(currentTime)] + 1
       } else {
         Y <- Y+1;
         XList[i] <- X
@@ -263,13 +270,14 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
         TList[i] <- minStack
         currentTime <- minStack
         stackTimeY <- stackTimeY[-1]
+        Ybirth[ceiling(currentTime)] = Ybirth[ceiling(currentTime)] + 1
       }
       if (currentTime > maxT){
         break
       }
     }
   }
-  my_list <- list("XList" = XList, "YList" = YList, "TList" = TList)
+  my_list <- list("XList" = XList, "YList" = YList, "TList" = TList, "Xbirth" = Xbirth, "Xdeath" = Xdeath, "Ybirth" = Ybirth, "Ydeath" = Ydeath)
   return(my_list)
 }
 
@@ -516,7 +524,7 @@ KI <- function(P, maxt){
 }   
 
 # this function is an approximate propensity for birth process Y in eq (S9) & (S10) on page XY_DDE docu. 
-KI.Y <-function(P=Delta.Y,in.X, K.M){
+KI.Y <-function(P,in.X, K.M){
   a <- P[1]             #shape parameter alpha of gamma distribution in Eq.(S9) in Sup.
   b <- P[2]             #rate parameter beta of gamma distribution in Eq.(S9) in Sup.
   X <- in.X
@@ -548,7 +556,7 @@ KI.Y <-function(P=Delta.Y,in.X, K.M){
 # this function is an approximate propensity for birth process Y in eq (S9) & (S10) on page XY_DDE docu. 
 # this function assume that Y(t) is affected by only X(t-5) and X(t-6).
 # if t<6 then Y(t) is affected by X(1)
-KI.Ynt <-function(P=Delta.X,in.X, N = 4, K.M){
+KI.Ynt <-function(P,in.X, N = 4, K.M){
   a <- P[1]             #shape parameter alpha of gamma distribution in Eq.(S9) in Sup.
   b <- P[2]             #rate parameter beta of gamma distribution in Eq.(S9) in Sup.
   X <- in.X
@@ -622,13 +630,13 @@ MH.P.X <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt, f
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
   
   if(flatpri){
-  logMH <- (l.lik.st - l.lik 
-            + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-            - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+    logMH <- (l.lik.st - l.lik 
+              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   }else{
-  logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
-            + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-            - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+    logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   }
   
   # print(S)
@@ -640,7 +648,56 @@ MH.P.X <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt, f
   if(is.nan(min(S.update))) S.update=S
   S.update=(S.update+S)/2;
   return(list(P=P, S=S.update, count=count))
-} 
+}
+
+MH.P.Y <- function(P,S,rep, r.Y.birth, in.X, Ay, K.M, tun, pri.alpha.Y, pri.beta.Y, maxt, flatpri = FALSE){
+  count = 0
+  repeat{
+    u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
+    P.star = P + S%*%u
+    # if(P.star[1]>1 && P.star[2]>0){
+    #   break
+    # }
+    if(P.star[1]>0 && P.star[2]>0){
+      break
+    }
+  }
+  
+  ## Under editing. - 2020.06.30
+  
+  KI.Y.star <- KI.Y(P = P.star, in.X = in.X,  K.M = K.M)      # calculating kappa using current alpha & candidate of beta
+  KI.Y.m <- KI.Y(P = P, in.X = in.X,  K.M = K.M)              # calculating kappa using current alpha & beta
+  
+  l.lik.st <- sum(r.Y.birth * log(KI.Y.star[,1]), na.rm = T) - Ay * (sum(KI.Y.star[,1])) 
+  l.lik <- sum(r.Y.birth * log(KI.Y.m[,1]), na.rm = T) - Ay * (sum(KI.Y.m[,1]))
+  
+  l.prior1.st <- dgamma(P.star[1], pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
+  l.prior1    <- dgamma(P[1]     , pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
+  l.prior2.st <- dgamma(P.star[2], pri.beta.Y[1], pri.beta.Y[2], log = TRUE)
+  l.prior2    <- dgamma(P[2]     , pri.beta.Y[1], pri.beta.Y[2], log = TRUE)
+  
+  if(flatpri){
+    logMH <- (l.lik.st - l.lik 
+              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }else{
+    logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }
+  
+  # print(S)
+  alpha = min (exp(logMH),1)
+  if(!is.nan(alpha) && runif(1)<alpha){
+    P <- P.star;count = 1;
+  } 
+  S.update=ramcmc::adapt_S(S,u,alpha,rep,gamma = min(1,(2*rep)^(-2/2)))
+  if(is.nan(min(S.update))) S.update=S
+  S.update=(S.update+S)/2;
+  return(list(P=P, S=S.update, count=count))
+}
+
+
 
 MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt, flatpri = FALSE) {
   count = 0
@@ -668,6 +725,53 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
   l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
+  
+  if(flatpri){
+    logMH <- (l.lik.st - l.lik 
+              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }else{
+    logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }
+  alpha = min (exp(logMH),1)
+  if(!is.nan(alpha) && runif(1)<alpha){
+    P <- P.star;count = 1;
+  } 
+  S.update=ramcmc::adapt_S(S,u,alpha,rep,gamma = min(1,(2*rep)^(-2/2)))
+  if(is.nan(min(S.update))) S.update=S
+  S.update=(S.update+S)/2;
+  return(list(P=P, S=S.update, count=count))
+}
+
+MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, pri.beta.Y, maxt, flatpri = FALSE) {
+  count = 0
+  repeat{
+    u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
+    P.star = P + S%*%u
+    # if(P.star[1]>1 && P.star[2]>0){
+    #   break
+    # }
+    if(P.star[1]>0 && P.star[2]>0){
+      break
+    }
+  }
+  
+  l.lik.st <- 0
+  l.lik <- 0
+  
+  for (i in 1:ncol(r.Y.birth)){
+    Rii <- r.Y.birth[, i]
+    KI.Y.star <- KI.Y(P.star, in.X = in.X.all[,i], K.M = K.M)      # calculating kappa using current alpha & candidate of beta
+    KI.Y.m <- KI.Y(P, in.X = in.X.all[,i], K.M = K.M)              # calculating kappa using current alpha & beta
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.Y.star[,1]), na.rm = T) - Ay * (sum(KI.Y.star[,1]))
+    l.lik <- l.lik + sum(Rii * log(KI.Y.m[,1]), na.rm = T) - Ay * (sum(KI.Y.m[,1]))
+  }
+  l.prior1.st <- dgamma(P.star[1], pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
+  l.prior1    <- dgamma(P[1]     , pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
+  l.prior2.st <- dgamma(P.star[2], pri.beta.Y[1], pri.beta.Y[2], log = TRUE)
+  l.prior2    <- dgamma(P[2]     , pri.beta.Y[1], pri.beta.Y[2], log = TRUE)
   
   if(flatpri){
     logMH <- (l.lik.st - l.lik 

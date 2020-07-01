@@ -32,32 +32,18 @@ sim.Y.all <- matrix(0, nrow = max.T+1, ncol = nsample)
 for(jj in 1:nsample){
   # myList is raw simulated data. 
   myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3)
-  
   birthX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == 1) # binary for the birth reaction of X
   deathX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == -1) # binary for the death reaction of X
   birthY.sim.tmp <- as.numeric(diff(c(0, myList$YList)) == 1) # binary for the birth reaction of Y
   deathY.sim.tmp <- as.numeric(diff(c(0, myList$YList)) == -1) # binary for the death reaction of Y
-  
   # sim.X is true X data, and sim.Y is true Y data.
-  sim.X.all[,jj] <- approx(myList$TList[!is.na(myList$TList)], myList$XList[!is.na(myList$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList$XList[!is.na(myList$XList)]))$y
-  sim.Y.all[,jj] <- approx(myList$TList[!is.na(myList$TList)], myList$YList[!is.na(myList$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList$YList[!is.na(myList$YList)]))$y
+  birthX.sim[,jj] <- myList$Xbirth[1:max.T]
+  deathX.sim[,jj] <- myList$Xdeath[1:max.T]
+  birthY.sim[,jj] <- myList$Ybirth[1:max.T]
+  deathY.sim[,jj] <- myList$Ydeath[1:max.T]
   
-  # stacking the birth and death reaction numbers of X and Y.
-  for(i in 1:length(ceiling(myList$TList))){
-    t <- ceiling(myList$TList)[i]
-    if(is.na(t)){
-      warning("Current time t is NA.")
-      warning("repnum in the gillespie algorithm might be not enough.")
-      break;
-    }
-    if(t > max.T){
-      break;
-    }
-    birthX.sim[t,jj] <- birthX.sim[t,jj] + birthX.sim.tmp[i]
-    deathX.sim[t,jj] <- deathX.sim[t,jj] + deathX.sim.tmp[i]
-    birthY.sim[t,jj] <- birthY.sim[t,jj] + birthY.sim.tmp[i]
-    deathY.sim[t,jj] <- deathY.sim[t,jj] + deathY.sim.tmp[i]
-  }
+  sim.X.all[,jj] <- c(0, cumsum(birthX.sim[,jj] - deathX.sim[,jj]))
+  sim.Y.all[,jj] <- c(0, cumsum(birthY.sim[,jj] - deathY.sim[,jj]))
 }
 Y.all <- sim.Y.all
 X.all <- sim.X.all
@@ -124,15 +110,15 @@ RR.all[,3,] <- birthX.sim
 
 for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
+  K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
+  
   for(jj in 1:nsample){
     RR.all[,1:2,jj] <- impute_r.Y(Y.all[,jj], B.Y = B.Y)
   }
   
   # step 3: sampling X &   r3, r4 
   # updating X using independent chain MH
-  
-  K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
-  
+
   # generate a proposal mean trajectory using the current parameter set.
   for(jj in 1:nsample){
     myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*10000), maxT = max.T+5)
@@ -141,11 +127,11 @@ for(rep in 2:nrepeat) {
     X.star <- c(0, cumsum(X.bir.st - X.dea.st));
     # print(X.update$errflg)
     if (useall == TRUE){
-      fy.st = A.Y * KI.Y(Delta.Y,in.X = X.star, K.M=theta[rep-1,2])
-      fy    = A.Y * KI.Y(Delta.Y,in.X = X.all[,jj]     , K.M=theta[rep-1,2])
+      fy.st = A.Y * KI.Y(P = Delta.Y,in.X = X.star, K.M=theta[rep-1,2])
+      fy    = A.Y * KI.Y(P = Delta.Y,in.X = X.all[,jj]     , K.M=theta[rep-1,2])
     }else{
-      fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
-      fy    = A.Y * KI.Ynt(Delta.Y,in.X = X.all[,jj]     , N = ptnum, K.M=theta[rep-1,2])
+      fy.st = A.Y * KI.Ynt(P = Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
+      fy    = A.Y * KI.Ynt(P = Delta.Y,in.X = X.all[,jj]     , N = ptnum, K.M=theta[rep-1,2])
     }
     q.Y.st = sum(log(dpois(RR.all[,1,jj],fy.st[,1])+1e-300), na.rm = T)
     q.Y    = sum(log(dpois(RR.all[,1,jj],fy[,1]   )+1e-300), na.rm = T)
@@ -189,7 +175,10 @@ for(rep in 2:nrepeat) {
   R.fit[4*rep-0,,] = RR.all[,4,] # death number of X
   
   
-  if(rep%%100 ==0 ) cat(rep)
+  if(rep%%100 ==0 ){
+    cat(rep)
+    cat(" ")
+  } 
   if(theta[rep,1] > 300){
     print("Estimated Ax > 300")
     break
