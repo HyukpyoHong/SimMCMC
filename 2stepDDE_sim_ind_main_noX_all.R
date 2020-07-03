@@ -32,10 +32,6 @@ sim.Y.all <- matrix(0, nrow = max.T+1, ncol = nsample)
 for(jj in 1:nsample){
   # myList is raw simulated data. 
   myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3)
-  birthX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == 1) # binary for the birth reaction of X
-  deathX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == -1) # binary for the death reaction of X
-  birthY.sim.tmp <- as.numeric(diff(c(0, myList$YList)) == 1) # binary for the birth reaction of Y
-  deathY.sim.tmp <- as.numeric(diff(c(0, myList$YList)) == -1) # binary for the death reaction of Y
   # sim.X is true X data, and sim.Y is true Y data.
   birthX.sim[,jj] <- myList$Xbirth[1:max.T]
   deathX.sim[,jj] <- myList$Xdeath[1:max.T]
