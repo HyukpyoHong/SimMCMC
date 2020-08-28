@@ -18,9 +18,15 @@ alpha.Y <- 3.6; beta.Y <- 0.6*int;
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
 K.M <- 200; 
 
+<<<<<<< HEAD
 max.T <- 50 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
 nsample <- 10;
+=======
+max.T <- 100 # simulated data will be given from t = 0, ..., max.T
+tspan <- 0:max.T
+nsample <- 20;
+>>>>>>> develop
 
 birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of X
 deathX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of X
@@ -31,37 +37,20 @@ sim.Y.all <- matrix(0, nrow = max.T+1, ncol = nsample)
 
 for(jj in 1:nsample){
   # myList is raw simulated data. 
-  myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*500, maxT = max.T+3)
-  
-  birthX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == 1) # binary for the birth reaction of X
-  deathX.sim.tmp <- as.numeric(diff(c(0, myList$XList)) == -1) # binary for the death reaction of X
-  birthY.sim.tmp <- as.numeric(diff(c(0, myList$YList)) == 1) # binary for the birth reaction of Y
-  deathY.sim.tmp <- as.numeric(diff(c(0, myList$YList)) == -1) # binary for the death reaction of Y
-  
+  myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3)
   # sim.X is true X data, and sim.Y is true Y data.
-  sim.X.all[,jj] <- approx(myList$TList[!is.na(myList$TList)], myList$XList[!is.na(myList$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList$XList[!is.na(myList$XList)]))$y
-  sim.Y.all[,jj] <- approx(myList$TList[!is.na(myList$TList)], myList$YList[!is.na(myList$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList$YList[!is.na(myList$YList)]))$y
+  birthX.sim[,jj] <- myList$Xbirth[1:max.T]
+  deathX.sim[,jj] <- myList$Xdeath[1:max.T]
+  birthY.sim[,jj] <- myList$Ybirth[1:max.T]
+  deathY.sim[,jj] <- myList$Ydeath[1:max.T]
   
-  # stacking the birth and death reaction numbers of X and Y.
-  for(i in 1:length(ceiling(myList$TList))){
-    t <- ceiling(myList$TList)[i]
-    if(is.na(t)){
-      warning("Current time t is NA.")
-      warning("repnum in the gillespie algorithm might be not enough.")
-      break;
-    }
-    if(t > max.T){
-      break;
-    }
-    birthX.sim[t,jj] <- birthX.sim[t,jj] + birthX.sim.tmp[i]
-    deathX.sim[t,jj] <- deathX.sim[t,jj] + deathX.sim.tmp[i]
-    birthY.sim[t,jj] <- birthY.sim[t,jj] + birthY.sim.tmp[i]
-    deathY.sim[t,jj] <- deathY.sim[t,jj] + deathY.sim.tmp[i]
-  }
+  sim.X.all[,jj] <- c(0, cumsum(birthX.sim[,jj] - deathX.sim[,jj]))
+  sim.Y.all[,jj] <- c(0, cumsum(birthY.sim[,jj] - deathY.sim[,jj]))
 }
 Y.all <- sim.Y.all
 X.all <- sim.X.all
 
+<<<<<<< HEAD
 lines(rowMeans(Y.all), col ="red")
 plot(rowMeans(Y.all))
 
@@ -73,6 +62,12 @@ pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
 pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
 pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
 pri.KM <- c(1, 0.001); # non-informative prior for KM
+=======
+pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
+pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
+pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
+pri.KM <- c(0.001, 0.001); # non-informative prior for KM
+>>>>>>> develop
 
 tun.KM <- 1; 
 tun.Delta.X <- c(1.0, 1);
@@ -131,35 +126,44 @@ RR.all[,3,] <- birthX.sim
 
 for(rep in 2:nrepeat) {
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
+  K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
+  
   for(jj in 1:nsample){
     RR.all[,1:2,jj] <- impute_r.Y(Y.all[,jj], B.Y = B.Y)
   }
+  
   # step 3: sampling X &   r3, r4 
   # updating X using independent chain MH
-  
+
   # generate a proposal mean trajectory using the current parameter set.
   for(jj in 1:nsample){
-    myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*500), maxT = max.T+5)
+    myListX <- TimeDelayGillespieforXR(A.X = theta[rep-1,1], B.X = B.X, alpha.X = theta[rep-1,3], beta.X = theta[rep-1,4], repnum = round(max.T*10000), maxT = max.T+5)
     X.bir.st <- myListX$Xbirth[1:max.T]
     X.dea.st <- myListX$Xdeath[1:max.T]
     X.star <- c(0, cumsum(X.bir.st - X.dea.st));
     # print(X.update$errflg)
     if (useall == TRUE){
-      fy.st = A.Y * KI.Y(Delta.Y,in.X = X.star, K.M=theta[rep-1,2])
-      fy    = A.Y * KI.Y(Delta.Y,in.X = X.all[,jj]     , K.M=theta[rep-1,2])
+      fy.st = A.Y * KI.Y(P = Delta.Y,in.X = X.star, K.M=theta[rep-1,2])
+      fy    = A.Y * KI.Y(P = Delta.Y,in.X = X.all[,jj]     , K.M=theta[rep-1,2])
     }else{
-      fy.st = A.Y * KI.Ynt(Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
-      fy    = A.Y * KI.Ynt(Delta.Y,in.X = X.all[,jj]     , N = ptnum, K.M=theta[rep-1,2])
+      fy.st = A.Y * KI.Ynt(P = Delta.Y,in.X = X.star, N = ptnum, K.M=theta[rep-1,2])
+      fy    = A.Y * KI.Ynt(P = Delta.Y,in.X = X.all[,jj]     , N = ptnum, K.M=theta[rep-1,2])
     }
     q.Y.st = sum(log(dpois(RR.all[,1,jj],fy.st[,1])+1e-300), na.rm = T)
     q.Y    = sum(log(dpois(RR.all[,1,jj],fy[,1]   )+1e-300), na.rm = T)
     
-    prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
-    prior.X   = sum(log(dgamma(X.all[,jj], shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+    # prior.X.st = sum(log(dgamma(X.star , shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
+    # prior.X   = sum(log(dgamma(X.all[,jj], shape = 1, rate = 1e-2) + 1e-300)) # non-informative gamma prior
     
     # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
     logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
     
+<<<<<<< HEAD
+    # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
+    logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
+    
+=======
+>>>>>>> develop
     # print(logMH);
     if(!is.nan(logMH) && runif(1)<exp(logMH)){
       X.all[,jj] <- X.star; RR.all[,3,jj] <- X.bir.st; RR.all[,4,jj] <- X.dea.st;
@@ -168,7 +172,11 @@ for(rep in 2:nrepeat) {
   }
   
   # step  4: samping A.X 
+<<<<<<< HEAD
   g_11 <- sum(K.i)
+=======
+  g_11 <- sum(K.i);
+>>>>>>> develop
   theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + nsample * pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
   
   # theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]), rate = nsample * g_11); # Completely non-informative, i.e., always prior.X.st == prior.X 
@@ -179,10 +187,9 @@ for(rep in 2:nrepeat) {
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
   
-  K.i <- KI(P = theta[rep,3:4], maxt = max.T);
   
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y)
+  KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y, flatpri = TRUE)
   theta[rep,2] = KM.update$km;
   KM.S = KM.update$s
   count_KM = count_KM + KM.update$count
@@ -193,8 +200,16 @@ for(rep in 2:nrepeat) {
   R.fit[4*rep-1,,] = RR.all[,3,] # birth number of X
   R.fit[4*rep-0,,] = RR.all[,4,] # death number of X
   
+<<<<<<< HEAD
   # S.fit[rep,] = as.vector(Delta.X.S)
   if(rep%%100 ==0 ) cat(rep)
+=======
+  
+  if(rep%%100 ==0 ){
+    cat(rep)
+    cat(" ")
+  } 
+>>>>>>> develop
   if(theta[rep,1] > 300){
     print("Estimated Ax > 300")
     break
@@ -224,6 +239,7 @@ for(jj in 1:gen.num){
 mean.y <- colMeans(gen.y2)
 
 
+<<<<<<< HEAD
 colMeans(theta[1:420,])
 # plot(colMeans(birthY)); lines(birthY.sim);
 
@@ -277,3 +293,5 @@ plot(theta[,3]/theta[,4], type = "l")
 plot(theta[,3]/theta[,4]^2, type = "l")
 plot(theta[,4], type = "l")
 
+=======
+>>>>>>> develop
