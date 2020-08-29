@@ -140,7 +140,7 @@ TimeDelayGillespieforX <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, max
   return(my_list)
 }
 
-TimeDelayGillespieforXR <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, maxT = 100){
+TimeDelayGillespieforXR <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, maxT = 100, Volume = 1){
   X <- 0
   XList <- rep(NA, repnum)
   Xbirth <- rep(0, maxT)
@@ -152,7 +152,7 @@ TimeDelayGillespieforXR <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, ma
   stackTimeX <- c()
   
   for (i in 1:repnum){
-    a1 <- A.X
+    a1 <- Volume * A.X
     a2 <- B.X * X
     a0 <- sum(a1,a2)
     # r2 <- runif(1)
@@ -190,11 +190,16 @@ TimeDelayGillespieforXR <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, ma
       break
     }
   }
+  
+  XList <- XList/Volume
+  Xbirth <- Xbirth/Volume
+  Xdeath <- Xdeath/Volume
+  
   my_list <- list("XList" = XList, "TList" = TList, "Xbirth" = Xbirth, "Xdeath" = Xdeath)
   return(my_list)
 }
 
-TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y, beta.Y, K.M, repnum = 3000, maxT = 100){
+TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y, beta.Y, K.M, repnum = 300000, maxT = 100, Volume = 1){
   X <- 0
   XList <- rep(NA, repnum)
   Y <- 0
@@ -210,11 +215,13 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
   stackTimeX <- c()
   stackTimeY <- c()
   
+  K.M <- K.M * Volume^n 
+  
   for (i in 1:repnum){
-    a1 <- A.X
+    a1 <- Volume * A.X
     a2 <- B.X * X
     # a3 <- lambda2 * X # Linear 
-    a3 = A.Y * (X^n / (K.M^n + X^n)) # Michaelis-Menten or Hill-Type
+    a3 <- Volume * A.Y * (X^n / (K.M^n + X^n)) # Michaelis-Menten or Hill-Type
     a4 <- B.Y * Y
     a0 <- sum(a1,a2,a3,a4)
     # r2 <- runif(1)
@@ -230,7 +237,7 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
     if (currentTime < minStack){                                    
       r1 <- runif(1)
       if (r1 < a1/a0){
-        XList[i] <- X
+        XList[i] <-X
         YList[i] <- Y
         TList[i] <- currentTime
         stackTimeX <- c(stackTimeX, currentTime + k*rgamma(n=1, shape = alpha.X, rate = beta.X))
@@ -277,6 +284,13 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
       }
     }
   }
+  XList <- XList/Volume
+  YList <- YList/Volume
+  Xbirth <- Xbirth/Volume
+  Xdeath <- Xdeath/Volume
+  Ybirth <- Ybirth/Volume
+  Ydeath <- Ydeath/Volume
+    
   my_list <- list("XList" = XList, "YList" = YList, "TList" = TList, "Xbirth" = Xbirth, "Xdeath" = Xdeath, "Ybirth" = Ybirth, "Ydeath" = Ydeath)
   return(my_list)
 }
