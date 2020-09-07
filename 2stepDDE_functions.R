@@ -90,7 +90,7 @@ q.R <- function(r,H0){
 }
 
 # 2020.03.25 = Hyukpyo. Generate delayed X for the proposal mean to implement the independent chain MCMC.
-
+# 2020.09.01. (Hyukpyo) This code 'TimeDelayGillespieforX' is not used anymore.
 TimeDelayGillespieforX <- function(A.X, B.X, alpha.X, beta.X, repnum = 3000, maxT = 100){
   X <- 0
   XList <- rep(NA, repnum)
