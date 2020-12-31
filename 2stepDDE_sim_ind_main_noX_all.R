@@ -21,6 +21,7 @@ K.M <- 200;
 max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
 nsample <- 20;
+vol <- 3;
 
 birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of X
 deathX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of X
@@ -31,12 +32,12 @@ sim.Y.all <- matrix(0, nrow = max.T+1, ncol = nsample)
 
 for(jj in 1:nsample){
   # myList is raw simulated data. 
-  myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3)
+  myList <- TimeDelayGillespieforXY(A.X = A.X, B.X = B.X, alpha.X = alpha.X, beta.X = beta.X, A.Y = A.Y, B.Y = B.Y, alpha.Y = alpha.Y, beta.Y = beta.Y, K.M = K.M, repnum = max.T*10000, maxT = max.T+3, Volume = vol)
   # sim.X is true X data, and sim.Y is true Y data.
-  birthX.sim[,jj] <- myList$Xbirth[1:max.T]
-  deathX.sim[,jj] <- myList$Xdeath[1:max.T]
-  birthY.sim[,jj] <- myList$Ybirth[1:max.T]
-  deathY.sim[,jj] <- myList$Ydeath[1:max.T]
+  birthX.sim[,jj] <- floor(myList$Xbirth[1:max.T])
+  deathX.sim[,jj] <- floor(myList$Xdeath[1:max.T])
+  birthY.sim[,jj] <- floor(myList$Ybirth[1:max.T])
+  deathY.sim[,jj] <- floor(myList$Ydeath[1:max.T])
   
   sim.X.all[,jj] <- c(0, cumsum(birthX.sim[,jj] - deathX.sim[,jj]))
   sim.Y.all[,jj] <- c(0, cumsum(birthY.sim[,jj] - deathY.sim[,jj]))
@@ -52,7 +53,7 @@ pri.KM <- c(0.001, 0.001); # non-informative prior for KM
 tun.KM <- 1; 
 tun.Delta.X <- c(1.0, 1);
 
-effrepeat <- 1000
+effrepeat <- 100
 burn <- 0; thin <- 1;
 nrepeat <- burn + thin*effrepeat;
 
@@ -171,7 +172,7 @@ for(rep in 2:nrepeat) {
   R.fit[4*rep-0,,] = RR.all[,4,] # death number of X
   
   
-  if(rep%%100 ==0 ){
+  if(rep%%10 ==0 ){
     cat(rep)
     cat(" ")
   } 
@@ -201,5 +202,16 @@ for(jj in 1:gen.num){
   gen.y2[jj,] <- approx(myList2$TList[!is.na(myList2$TList)], myList2$YList[!is.na(myList2$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$YList[!is.na(myList2$YList)]))$y
 }
 mean.y <- colMeans(gen.y2)
+
+matplot(0:max.T, X.all1, type = "l", ylim = c(0,250))
+matplot(0:max.T, X.all3, type = "l", ylim = c(0,250))
+
+
+
+matplot(0:max.T, Y.all, type = "l", ylim = c(0,600))
+matplot(0:max.T, Y.all, type = "l", ylim = c(0,150), xlim = c(0,40))
+
+matplot(0:max.T, Y.all1, type = "l", ylim = c(0,250))
+
 
 

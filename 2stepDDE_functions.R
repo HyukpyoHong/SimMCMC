@@ -38,6 +38,12 @@ impute_r.Y.mean <- function(y, B.Y){
   return(cbind(r1,r2))
 }
 
+dpois_conti <- function(x, lambda){
+
+   return(lambda^x/gamma(x+1) * exp(-lambda))
+
+  }
+
 
 #propensity of X 
 # birth & death process. birth process has delay. 

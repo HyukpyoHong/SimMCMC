@@ -52,12 +52,11 @@ pri.alpha.Y <- c(0.001, 0.001); # inormative prior for alpha.X
 pri.beta.Y <- c(0.001, 0.001); # inormative prior for beta.X
 pri.B <- c(0.001, 0.001); # non-informative prior for KM
 
-
 tun.KM <- 1; 
 tun.Delta.X <- c(1.0, 1);
 tun.Delta.Y <- c(1.0, 1);
 
-effrepeat <- 200
+effrepeat <- 100
 burn <- 0; thin <- 1;
 nrepeat <- burn + thin*effrepeat;
 
@@ -112,6 +111,14 @@ RR.all[,2,] <- deathY.sim
 RR.all[,3,] <- birthX.sim
 RR.all[,4,] <- deathX.sim
 
+# fix B
+theta[,8] <- theta.X[2];
+# fix AY
+theta[,5] <- theta.Y[1];
+# fix alphaY and beta Y
+theta[,6] <- Delta.Y[1];
+theta[,7] <- Delta.Y[2];
+
 for(rep in 2:nrepeat){
   # step 1 & 2: sampling  r2 and r1 (death and birth of Y)
   K.i <- KI(P = theta[rep-1,3:4], maxt = max.T);
@@ -120,7 +127,7 @@ for(rep in 2:nrepeat){
     RR.all[,1:2,jj] <- impute_r.Y(Y.all[,jj], B.Y = theta[rep-1,8])
   }
   
-  # step 3: sampling X &   r3, r4
+  # step 3: sampling X & r3, r4
   # updating X using independent chain MH
   
   # generate a proposal mean trajectory using the current parameter set.
@@ -173,23 +180,23 @@ for(rep in 2:nrepeat){
   count_KM = count_KM + KM.update$count
   
   # step 8: sampling alpha.Y and beta.Y: the delay parameters for the birth reaction of Y.
-  p.update <- MH.P.Y.all(P = theta[rep-1,6:7], S = Delta.Y.S, rep = rep, r.Y.birth = RR.all[,1,], in.X.all = X.all, Ay = theta[rep,5], K.M = theta[rep, 2], tun = tun.Delta.Y, pri.alpha.Y = pri.alpha.Y, pri.beta.Y = pri.beta.Y, maxt = max.T)
-  theta[rep,6:7] = p.update$P
-  Delta.Y.S = p.update$S
-  count_Delta.Y = count_Delta.Y + p.update$count
+  # p.update <- MH.P.Y.all(P = theta[rep-1,6:7], S = Delta.Y.S, rep = rep, r.Y.birth = RR.all[,1,], in.X.all = X.all, Ay = theta[rep,5], K.M = theta[rep, 2], tun = tun.Delta.Y, pri.alpha.Y = pri.alpha.Y, pri.beta.Y = pri.beta.Y, maxt = max.T)
+  # theta[rep,6:7] = p.update$P
+  # Delta.Y.S = p.update$S
+  # count_Delta.Y = count_Delta.Y + p.update$count
   
   # step 9: sampling A.Y
-  KY.sum <- 0
-  for(ii in 1:nsample){
-    KY.i <- KI.Y(P = theta[rep,6:7], in.X = X.all[,ii], K.M = theta[rep,2])
-    KY.sum <- KY.sum + sum(KY.i[,1])
-  }
-  theta[rep,5] = rgamma(1,shape = sum(RR.all[,1,]) + nsample * pri.A.Y[1], rate = KY.sum + nsample*pri.A.Y[2]);
+  # KY.sum <- 0
+  # for(ii in 1:nsample){
+  #   KY.i <- KI.Y(P = theta[rep,6:7], in.X = X.all[,ii], K.M = theta[rep,2])
+  #   KY.sum <- KY.sum + sum(KY.i[,1])
+  # }
+  # theta[rep,5] = rgamma(1,shape = sum(RR.all[,1,]) + nsample * pri.A.Y[1], rate = KY.sum + nsample*pri.A.Y[2]);
   
   
   # step 10: sampling B(=B.X=B.Y); the common dilution rate 
-  theta[rep,8] = rgamma(1,shape = sum(RR.all[,2,]) + sum(RR.all[,4,]) + nsample*pri.B[1], 
-                        rate = sum(X.all) + sum(Y.all) - 0.5*sum(X.all[max.T+1,]) - 0.5*sum(Y.all[max.T+1,])+ nsample*pri.B[2]);
+  # theta[rep,8] = rgamma(1,shape = sum(RR.all[,2,]) + sum(RR.all[,4,]) + nsample*pri.B[1], 
+  #                       rate = sum(X.all) + sum(Y.all) - 0.5*sum(X.all[max.T+1,]) - 0.5*sum(Y.all[max.T+1,])+ nsample*pri.B[2]);
   
 
   X.fit[rep,,] = X.all
