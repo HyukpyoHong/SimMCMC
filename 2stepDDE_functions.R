@@ -301,6 +301,178 @@ TimeDelayGillespieforXY <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, alpha.Y
   return(my_list)
 }
 
+
+GillespieforXYonlyXdelay <- function(A.X, B.X, alpha.X, beta.X, A.Y, B.Y, K.M, repnum = 300000, maxT = 100, Volume = 1){
+  X <- 0
+  XList <- rep(NA, repnum)
+  Y <- 0
+  YList <- rep(NA, repnum)
+  currentTime <- 0
+  TList <- rep(NA, repnum)
+  Xbirth <- rep(0, maxT)
+  Xdeath <- rep(0, maxT)
+  Ybirth <- rep(0, maxT)
+  Ydeath <- rep(0, maxT)
+  n <- 1
+  k <- 1
+  stackTimeX <- c()
+
+  K.M <- K.M * Volume^n 
+  
+  for (i in 1:repnum){
+    a1 <- Volume * A.X
+    a2 <- B.X * X
+    # a3 <- lambda2 * X # Linear 
+    a3 <- Volume * A.Y * (X^n / (K.M^n + X^n)) # Michaelis-Menten or Hill-Type
+    a4 <- B.Y * Y
+    a0 <- sum(a1,a2,a3,a4)
+    # r2 <- runif(1)
+    currentTime <- currentTime + rexp(1, rate = a0)
+    
+    stackTimeX <- sort(stackTimeX)  
+    if(!(is.null(stackTimeX))){
+      minStack <- min(stackTimeX)
+    } else {
+      minStack <- Inf
+    }
+    if (currentTime < minStack){                                    
+      r1 <- runif(1)
+      if (r1 < a1/a0){
+        XList[i] <-X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        stackTimeX <- c(stackTimeX, currentTime + k*rgamma(n=1, shape = alpha.X, rate = beta.X))
+        # stackTimeX <- c(stackTimeX, currentTime) # without the delay of births of X
+      } else if (r1 < (a1+a2)/a0){
+        X <- X-1;
+        XList[i] <- X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        Xdeath[ceiling(currentTime)] = Xdeath[ceiling(currentTime)] + 1
+      } else if (r1 < (a1+a2+a3)/a0){
+        Y <- Y+1
+        XList[i] <- X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        Ybirth[ceiling(currentTime)] = Ybirth[ceiling(currentTime)] + 1
+      } else {
+        Y <- Y-1;
+        XList[i] <- X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        Ydeath[ceiling(currentTime)] = Ydeath[ceiling(currentTime)] + 1
+      }
+    } else{
+      X <- X+1;
+      XList[i] <- X
+      YList[i] <- Y
+      TList[i] <- minStack
+      currentTime <- minStack
+      stackTimeX <- stackTimeX[-1]
+      Xbirth[ceiling(currentTime)] = Xbirth[ceiling(currentTime)] + 1
+      if (currentTime > maxT){
+        break
+      }
+    }
+  }
+  XList <- XList/Volume
+  YList <- YList/Volume
+  Xbirth <- Xbirth/Volume
+  Xdeath <- Xdeath/Volume
+  Ybirth <- Ybirth/Volume
+  Ydeath <- Ydeath/Volume
+  
+  my_list <- list("XList" = XList, "YList" = YList, "TList" = TList, "Xbirth" = Xbirth, "Xdeath" = Xdeath, "Ybirth" = Ybirth, "Ydeath" = Ydeath)
+  return(my_list)
+}
+
+GillespieforXYonlyYdelay <- function(A.X, B.X, A.Y, B.Y, alpha.Y, beta.Y, K.M, repnum = 300000, maxT = 100, Volume = 1){
+  X <- 0
+  XList <- rep(NA, repnum)
+  Y <- 0
+  YList <- rep(NA, repnum)
+  currentTime <- 0
+  TList <- rep(NA, repnum)
+  Xbirth <- rep(0, maxT)
+  Xdeath <- rep(0, maxT)
+  Ybirth <- rep(0, maxT)
+  Ydeath <- rep(0, maxT)
+  n <- 1
+  k <- 1
+  stackTimeY <- c()
+  
+  K.M <- K.M * Volume^n 
+  
+  for (i in 1:repnum){
+    a1 <- Volume * A.X
+    a2 <- B.X * X
+    # a3 <- lambda2 * X # Linear 
+    a3 <- Volume * A.Y * (X^n / (K.M^n + X^n)) # Michaelis-Menten or Hill-Type
+    a4 <- B.Y * Y
+    a0 <- sum(a1,a2,a3,a4)
+    # r2 <- runif(1)
+    currentTime <- currentTime + rexp(1, rate = a0)
+    
+    stackTimeY <- sort(stackTimeY)
+    if(!(is.null(stackTimeY))){
+      minStack <- min(stackTimeY)
+    } else {
+      minStack <- Inf
+    }
+    if (currentTime < minStack){                                    
+      r1 <- runif(1)
+      if (r1 < a1/a0){
+        X <- X+1;
+        XList[i] <-X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        Xbirth[ceiling(currentTime)] = Xbirth[ceiling(currentTime)] + 1
+      } else if (r1 < (a1+a2)/a0){
+        X <- X-1;
+        XList[i] <- X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        Xdeath[ceiling(currentTime)] = Xdeath[ceiling(currentTime)] + 1
+      } else if (r1 < (a1+a2+a3)/a0){
+        XList[i] <- X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        stackTimeY <- c(stackTimeY, currentTime + k*rgamma(n=1, shape = alpha.Y, rate = beta.Y))
+        # stackTimeY <- c(stackTimeY, currentTime) # without the delay of births of Y
+      } else {
+        Y <- Y-1;
+        XList[i] <- X
+        YList[i] <- Y
+        TList[i] <- currentTime
+        Ydeath[ceiling(currentTime)] = Ydeath[ceiling(currentTime)] + 1
+      }
+    } else{
+      Y <- Y+1;
+      XList[i] <- X
+      YList[i] <- Y
+      TList[i] <- minStack
+      currentTime <- minStack
+      stackTimeY <- stackTimeY[-1]
+      Ybirth[ceiling(currentTime)] = Ybirth[ceiling(currentTime)] + 1
+      if (currentTime > maxT){
+        break
+      }
+    }
+  }
+  XList <- XList/Volume
+  YList <- YList/Volume
+  Xbirth <- Xbirth/Volume
+  Xdeath <- Xdeath/Volume
+  Ybirth <- Ybirth/Volume
+  Ydeath <- Ydeath/Volume
+  
+  my_list <- list("XList" = XList, "YList" = YList, "TList" = TList, "Xbirth" = Xbirth, "Xdeath" = Xdeath, "Ybirth" = Ybirth, "Ydeath" = Ydeath)
+  return(my_list)
+}
+
+
+
+
 # Metropolis-Hastings algorithm for updating trajectory of X and number of reaction of X 
 MH.X.R <-function(r,x,ki,bi=tun.B){
   maxt <- length(x) - 1;
@@ -550,10 +722,12 @@ KI.Y <-function(P,in.X, K.M){
   X <- in.X
   maxt <- length(X) - 1;
   A.m = function(t){
-    (1-t)*(pgamma(t,a,b)-pgamma(t-1,a,b)) + (gamma(a+1)/(b*gamma(a)))*(pgamma(t,a+1,b)-pgamma(t-1,a+1,b))
+    # (1-t)*(pgamma(t,a,b)-pgamma(t-1,a,b)) + (gamma(a+1)/(b*gamma(a)))*(pgamma(t,a+1,b)-pgamma(t-1,a+1,b))
+    (1-t)*(pgamma(t,a,b)-pgamma(t-1,a,b)) + a/b * (pgamma(t,a+1,b)-pgamma(t-1,a+1,b))
   }
   B.m = function(t){
-    t*(pgamma(t,a,b)-pgamma(t-1,a,b)) - (gamma(a+1)/(b*gamma(a)))*(pgamma(t,a+1,b)-pgamma(t-1,a+1,b)) 
+    # t*(pgamma(t,a,b)-pgamma(t-1,a,b)) - (gamma(a+1)/(b*gamma(a)))*(pgamma(t,a+1,b)-pgamma(t-1,a+1,b)) 
+    t*(pgamma(t,a,b)-pgamma(t-1,a,b)) - a/b * (pgamma(t,a+1,b)-pgamma(t-1,a+1,b)) 
   } 
   
   k.j =rep(1,maxt); A = rep(0,maxt); B=rep(0,maxt)
@@ -1376,4 +1550,23 @@ MH.A.X <- function(A,s,rep, r=RR[,3], g=g_11, b=1){
   return(list(A=A,s=s, count=count))
 }
 
+log_factorial <- function(x){
+  val = log(gamma(x+2 - ceiling(x)));
+  if(length(val)==1){
+    if (x >=1){
+      for (jj in 0:(ceiling(x)-1)){
+        val = val + log(x-jj)
+      }
+    }
+  }else{
+    for (ii in 1:length(val)){
+      if (x[ii] >=1){
+        for (jj in 0:(ceiling(x[ii])-1)){
+          val[ii] = val[ii] + log(x[ii]-jj)
+        }
+      } 
+    }
+  }
+  return(val)
+}
 
