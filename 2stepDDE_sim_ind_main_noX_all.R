@@ -14,16 +14,20 @@ B.Y <- 0.05*int;
 A.Y <- 60*int; 
 alpha.Y <- 3.6; beta.Y <- 0.6*int;  
 
+param_est <- c(1,1,1,1,1,1,1,1)
+
 # unknowns parameters
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
 K.M <- 200; 
 
 max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
-nsample <- 20;
-vol <- 3;
+nsample <- 10;
+vol <- 1;
 
-birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of X
+
+
+birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) #a list for the true birth number of X
 deathX.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of X
 birthY.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true birth number of Y
 deathY.sim <- matrix(0, nrow = max.T, ncol = nsample) # a list for the true death number of Y
@@ -147,23 +151,34 @@ for(rep in 2:nrepeat) {
   }
   
   # step  4: samping A.X 
-  g_11 <- sum(K.i);
-  theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + nsample * pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
-  
+  if(param_est[1] == 0){
+    theta[rep,1] = theta[rep-1,1]
+  }else{
+    g_11 <- sum(K.i);
+    theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + nsample * pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
+  }
   # theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]), rate = nsample * g_11); # Completely non-informative, i.e., always prior.X.st == prior.X 
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
+  if(param_est[3] == 0){
+    theta[rep,3:4] = theta[rep,3:4]
+  }else{
   p.update <- MH.P.X.all(P = theta[rep-1,3:4], Delta.X.S, rep, RR.all[,3,], Ax = theta[rep,1],  tun = tun.Delta.X, pri.alpha.X = pri.alpha.X, pri.beta.X = pri.beta.X, maxt = max.T)
   theta[rep,3:4] = p.update$P
   Delta.X.S = p.update$S
   count_Delta.X = count_Delta.X + p.update$count
-  
+  }
   
   # step 7: sampling the Michaelis-Menten constant K.M
-  KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y, flatpri = TRUE)
-  theta[rep,2] = KM.update$km;
-  KM.S = KM.update$s
-  count_KM = count_KM + KM.update$count
+  if(param_est[2] ==0){
+    theta[rep,2] = theta[rep-1,2]
+    count_KM = count_KM
+  }else{
+    KM.update = MH.KM.all(theta[rep-1,2] , KM.S, rep, RR.all[,1,], X.all, b = tun.KM, pri.KM = pri.KM, Delta.Y = Delta.Y, flatpri = TRUE)
+    theta[rep,2] = KM.update$km;
+    KM.S = KM.update$s
+    count_KM = count_KM + KM.update$count
+  }
   
   X.fit[rep,,] = X.all
   R.fit[4*rep-3,,] = RR.all[,1,] # birth number of Y

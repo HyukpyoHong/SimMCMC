@@ -21,6 +21,12 @@ impute_r.Y <- function(y, B.Y){
   Y.diff = diff(y)
   r2 = rpois(length(Y.diff),B.Y*(y[-length(y)]+y[-1])/2)
   r1 = Y.diff + r2
+  for(jj in 1:length(r1)){
+    if (r1[jj] < 0){
+      r1[jj] = 0
+      r2[jj] = -Y.diff[jj]
+    }
+  }
   return(cbind(r1,r2))
 }
 
@@ -723,17 +729,17 @@ KI.Y <-function(P,in.X, K.M){
   maxt <- length(X) - 1;
   A.m = function(t){
     # (1-t)*(pgamma(t,a,b)-pgamma(t-1,a,b)) + (gamma(a+1)/(b*gamma(a)))*(pgamma(t,a+1,b)-pgamma(t-1,a+1,b))
-    (1-t)*(pgamma(t,a,b)-pgamma(t-1,a,b)) + a/b * (pgamma(t,a+1,b)-pgamma(t-1,a+1,b))
+    (1-t)*(pgamma(t,a,b)-pgamma(t-1,a,b)) + a/b * (pgamma(t,a+1,b) - pgamma(t-1,a+1,b))
   }
   B.m = function(t){
     # t*(pgamma(t,a,b)-pgamma(t-1,a,b)) - (gamma(a+1)/(b*gamma(a)))*(pgamma(t,a+1,b)-pgamma(t-1,a+1,b)) 
-    t*(pgamma(t,a,b)-pgamma(t-1,a,b)) - a/b * (pgamma(t,a+1,b)-pgamma(t-1,a+1,b)) 
+    t*(pgamma(t,a,b)-pgamma(t-1,a,b)) - a/b * (pgamma(t,a+1,b) - pgamma(t-1,a+1,b)) 
   } 
   
   k.j =rep(1,maxt); A = rep(0,maxt); B=rep(0,maxt)
   for (m in 0:(maxt-1)){
-    A[m+1] = integrate(A.m,m,m+1)$value
-    B[m+1] = integrate(B.m,m,m+1)$value
+    A[m+1] = max(integrate(A.m,m,m+1)$value, 0)
+    B[m+1] = max(integrate(B.m,m,m+1)$value, 0)
   }
   for (i in 0:(maxt-1)){
     msum = 0
@@ -893,7 +899,7 @@ MH.P.Y <- function(P,S,rep, r.Y.birth, in.X, Ay, K.M, tun, pri.alpha.Y, pri.beta
 
 
 
-MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt, flatpri = FALSE) {
+MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt, flatpri = FALSE, lowbnds = c(0,0)) {
   count = 0
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
@@ -901,7 +907,7 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
     # if(P.star[1]>1 && P.star[2]>0){
     #   break
     # }
-    if(P.star[1]>0 && P.star[2]>0){
+    if(P.star[1]>lowbnds[1] && P.star[2]>lowbnds[2]){
       break
     }
   }
@@ -922,12 +928,12 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
   
   if(flatpri){
     logMH <- (l.lik.st - l.lik 
-              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   }else{
     logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
-              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   }
   alpha = min (exp(logMH),1)
   if(!is.nan(alpha) && runif(1)<alpha){
@@ -939,7 +945,11 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
   return(list(P=P, S=S.update, count=count))
 }
 
-MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, pri.beta.Y, maxt, flatpri = FALSE) {
+
+
+
+
+MH.P.X.all.share3 <- function(P,S,rep, r.X.birth1,r.X.birth2,r.X.birth3, Ax, tun, pri.alpha.X, pri.beta.X, maxt, flatpri = FALSE, lowbnds = c(0,0)) {
   count = 0
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
@@ -947,7 +957,127 @@ MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, 
     # if(P.star[1]>1 && P.star[2]>0){
     #   break
     # }
-    if(P.star[1]>0 && P.star[2]>0){
+    if(P.star[1]>lowbnds[1] && P.star[2]>lowbnds[2]){
+      break
+    }
+  }
+  KI.star <- KI(P.star, maxt = maxt)      # calculating kappa using current alpha & candidate of beta
+  KI.m <- KI(P, maxt = maxt)              # calculating kappa using current alpha & beta
+  l.lik.st <- 0
+  l.lik <- 0
+  
+  for (i in 1:ncol(r.X.birth1)){
+    Rii <- r.X.birth1[, i]
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax[1] * (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax[1] * (sum(KI.m))
+  }
+  
+  for (i in 1:ncol(r.X.birth2)){
+    Rii <- r.X.birth2[, i]
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax[2] * (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax[2] * (sum(KI.m))
+  }
+  
+  for (i in 1:ncol(r.X.birth3)){
+    Rii <- r.X.birth3[, i]
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax[3] * (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax[3] * (sum(KI.m))
+  }
+  
+  
+  l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
+  l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
+  l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
+  l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
+  
+  
+  if(flatpri){
+    logMH <- (l.lik.st - l.lik 
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }else{
+    logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }
+  alpha = min (exp(logMH),1)
+  if(!is.nan(alpha) && runif(1)<alpha){
+    P <- P.star;count = 1;
+  } 
+  S.update=ramcmc::adapt_S(S,u,alpha,rep,gamma = min(1,(2*rep)^(-2/2)))
+  if(is.nan(min(S.update))) S.update=S
+  S.update=(S.update+S)/2;
+  return(list(P=P, S=S.update, count=count))
+}
+
+
+
+
+
+
+MH.P.X.all.share <- function(P,S,rep, r.X.birth, nsample, Ax, tun, pri.alpha.X, pri.beta.X, maxt, flatpri = FALSE, lowbnds = c(0,0)){
+  count = 0
+  repeat{
+    u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
+    P.star = P + S%*%u
+    # if(P.star[1]>1 && P.star[2]>0){
+    #   break
+    # }
+    if(P.star[1]>lowbnds[1] && P.star[2]>lowbnds[2]){
+      break
+    }
+  }
+  
+  l.lik.st <- 0
+  l.lik <- 0
+  
+  for(gg in 1:length(maxt)){
+    KI.star <- KI(P.star, maxt = maxt[gg])      # calculating kappa using current alpha & candidate of beta
+    KI.m <- KI(P, maxt = maxt[gg])              # calculating kappa using current alpha & beta
+    for (i in 1:nsample[gg]){
+      Rii <- r.X.birth[1:maxt[gg],i,gg]
+      l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax[gg] * (sum(KI.star))
+      l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax[gg] * (sum(KI.m))
+    }
+  }
+
+  l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
+  l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
+  l.prior2.st <- dgamma(P.star[2], pri.beta.X[1], pri.beta.X[2], log = TRUE)
+  l.prior2    <- dgamma(P[2]     , pri.beta.X[1], pri.beta.X[2], log = TRUE)
+
+  if(flatpri){
+    logMH <- (l.lik.st - l.lik 
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }else{
+    logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+  }
+  alpha = min (exp(logMH),1)
+  if(!is.nan(alpha) && runif(1)<alpha){
+    P <- P.star;count = 1;
+  }
+  
+  S.update=ramcmc::adapt_S(S,u,alpha,rep,gamma = min(1,(2*rep)^(-2/2)))
+  if(is.nan(min(S.update))) S.update=S
+  S.update=(S.update+S)/2;
+  return(list(P=P, S=S.update, count=count))
+}
+
+
+
+
+MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, pri.beta.Y, maxt, flatpri = FALSE, lowbnds = c(0,0)) {
+  count = 0
+  repeat{
+    u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
+    P.star = P + S%*%u
+    # if(P.star[1]>1 && P.star[2]>0){
+    #   break
+    # }
+    if(P.star[1]>lowbnds[1] && P.star[2]>lowbnds[2]){
       break
     }
   }
@@ -969,12 +1099,12 @@ MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, 
   
   if(flatpri){
     logMH <- (l.lik.st - l.lik 
-              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+              + log(pmvnorm(upper = c(P[1] - lowbnds[1] ,P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   }else{
     logMH <- (l.lik.st - l.lik + l.prior1.st - l.prior1 + l.prior2.st - l.prior2
-              + log(pmvnorm(upper = c(P[1] ,P[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
-              - log(pmvnorm(upper = c(P.star[1] ,P.star[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
+              + log(pmvnorm(upper = c(P[1] -lowbnds[1],P[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1])
+              - log(pmvnorm(upper = c(P.star[1] - lowbnds[1],P.star[2] - lowbnds[2]), sigma = S%*%t(S)%*%diag(c(tun[1],tun[2])))[1]))
   }
   alpha = min (exp(logMH),1)
   if(!is.nan(alpha) && runif(1)<alpha){
