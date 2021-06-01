@@ -20,21 +20,11 @@ param_est <- c(1,1,1,1,1,1,1,1)
 A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
 K.M <- 200; 
 
-<<<<<<< HEAD
-max.T <- 50 # simulated data will be given from t = 0, ..., max.T
-tspan <- 0:max.T
-nsample <- 10;
-=======
 max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
-<<<<<<< HEAD
 nsample <- 20;
->>>>>>> develop
-=======
-nsample <- 10;
 vol <- 1;
 
->>>>>>> develop
 
 
 birthX.sim <- matrix(0, nrow = max.T, ncol = nsample) #a list for the true birth number of X
@@ -59,7 +49,6 @@ for(jj in 1:nsample){
 Y.all <- sim.Y.all
 X.all <- sim.X.all
 
-<<<<<<< HEAD
 lines(rowMeans(Y.all), col ="red")
 plot(rowMeans(Y.all))
 
@@ -71,12 +60,6 @@ pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
 pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
 pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
 pri.KM <- c(1, 0.001); # non-informative prior for KM
-=======
-pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
-pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
-pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
-pri.KM <- c(0.001, 0.001); # non-informative prior for KM
->>>>>>> develop
 
 tun.KM <- 1; 
 tun.Delta.X <- c(1.0, 1);
@@ -166,13 +149,7 @@ for(rep in 2:nrepeat) {
     
     # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
     logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
-    
-<<<<<<< HEAD
-    # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
-    logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
-    
-=======
->>>>>>> develop
+
     # print(logMH);
     if(!is.nan(logMH) && runif(1)<exp(logMH)){
       X.all[,jj] <- X.star; RR.all[,3,jj] <- X.bir.st; RR.all[,4,jj] <- X.dea.st;
@@ -180,23 +157,15 @@ for(rep in 2:nrepeat) {
     }
   }
   
-  # step  4: samping A.X 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  g_11 <- sum(K.i)
-=======
   g_11 <- sum(K.i);
->>>>>>> develop
   theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + nsample * pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
   
-=======
   if(param_est[1] == 0){
     theta[rep,1] = theta[rep-1,1]
   }else{
     g_11 <- sum(K.i);
     theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + nsample * pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
   }
->>>>>>> develop
   # theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]), rate = nsample * g_11); # Completely non-informative, i.e., always prior.X.st == prior.X 
   
   # step 5 & 6: sampling alpha.X and beta.X: the delay parameters for the birth reaction of X.
@@ -226,16 +195,10 @@ for(rep in 2:nrepeat) {
   R.fit[4*rep-1,,] = RR.all[,3,] # birth number of X
   R.fit[4*rep-0,,] = RR.all[,4,] # death number of X
   
-<<<<<<< HEAD
-  # S.fit[rep,] = as.vector(Delta.X.S)
-  if(rep%%100 ==0 ) cat(rep)
-=======
-  
   if(rep%%10 ==0 ){
     cat(rep)
     cat(" ")
   } 
->>>>>>> develop
   if(theta[rep,1] > 300){
     print("Estimated Ax > 300")
     break
@@ -274,61 +237,3 @@ matplot(0:max.T, Y.all, type = "l", ylim = c(0,150), xlim = c(0,40))
 
 matplot(0:max.T, Y.all1, type = "l", ylim = c(0,250))
 
-
-
-<<<<<<< HEAD
-colMeans(theta[1:420,])
-# plot(colMeans(birthY)); lines(birthY.sim);
-
-result.par <- theta[selrow,]
-result.X.trj <- X.fit[selrow,,]
-# result.etc <- matrix(data= 0, nrow = max.T + 1, ncol = 4)
-# result.etc[,1] <- sim.X; result.etc[,2] <- sim.Y; result.etc[1,3] <- rndseed; 
-# result.etc[1,4] <- count_X / nrepeat; result.etc[2,4] <- count_Delta.X / nrepeat; result.etc[3,4] <- count_KM / nrepeat;  
-
-currentT <- Sys.time()
-timestamp <- paste(substr(currentT, 1,4), substr(currentT, 6,7), substr(currentT, 9,10),substr(currentT, 12,13), substr(currentT, 15,16), substr(currentT, 18,19), sep = "")
-
-# compath <- "D:/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/ProfChoi_Code_20200326//";
-compath <- "/home/users/hphong/TimeDelay//";
-
-par.X.filename <- paste("Parameters_maxT", toString(max.T), "_", toString(timestamp), ".csv", sep = "")
-X.trj.filename <- paste("Xtrj_maxT", toString(max.T), "_",  toString(timestamp), ".csv", sep = "")
-etc.filename <- paste("Etc_maxT", toString(max.T), "_",  toString(timestamp), ".csv", sep = "")
-
-# write.table(result.par, paste(compath, par.X.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
-# write.table(result.X.trj, paste(compath, X.trj.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
-# write.table(result.etc, paste(compath, etc.filename, sep = ""), row.names = FALSE, col.names = FALSE, sep = ",")
-
-### print result ###
-
-# plot(A.Y * KI.Y(Delta.Y, in.X = colMeans(result.X.trj), K.M = mean(theta[,2]))[,1])
-# lines(birthY.sim)
-plot(tspan, rowMeans(sim.Y.all))
-lines(tspan, mean.y, col = "red")
-
-# gen.y3 <- matrix(0, nrow = effrepeat, ncol = max.T+1)
-# for(jj in 1:effrepeat){
-#   myList2 <- TimeDelayGillespieforXY(A.X = theta[selrow[jj],1], B.X = 0.05, alpha.X = theta[selrow[jj],3], beta.X = theta[selrow[jj],4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = theta[selrow[jj],2], repnum = max.T*500, maxT = max.T+3)
-#   sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
-#   gen.y3[jj,] <- approx(myList2$TList[!is.na(myList2$TList)], myList2$YList[!is.na(myList2$YList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$YList[!is.na(myList2$YList)]))$y
-#   if(rep%%1000 ==0 ) cat("0")
-# }
-# mean.y2 <- colMeans(gen.y3)
-
-# tmp <- 1177
-# lines(tspan, gen.y3[tmp,], col = "blue")
-# theta[tmp,]
-
-colMeans(theta)
-
-plot(theta[,1], type = "l")
-plot(theta[,2], type = "l")
-plot(theta[,1]/theta[,2], type = "l")
-plot(theta[,3], type = "l")
-plot(theta[,3]/theta[,4], type = "l")
-plot(theta[,3]/theta[,4]^2, type = "l")
-plot(theta[,4], type = "l")
-
-=======
->>>>>>> develop
