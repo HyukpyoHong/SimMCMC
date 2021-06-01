@@ -22,7 +22,7 @@ K.M <- 200;
 
 max.T <- 100 # simulated data will be given from t = 0, ..., max.T
 tspan <- 0:max.T
-nsample <- 10;
+nsample <- 20;
 vol <- 1;
 
 
@@ -49,10 +49,17 @@ for(jj in 1:nsample){
 Y.all <- sim.Y.all
 X.all <- sim.X.all
 
+lines(rowMeans(Y.all), col ="red")
+plot(rowMeans(Y.all))
+
+
+tun.B <- c(50,50, 100, 100);
+tmp <- seq(from=0.1, by=1, length.out = max.T+1) # tunning parameter for the setting 1.
+
 pri.A.X <- c(0.001, 0.001); # non-informative prior for A.X
 pri.alpha.X <- c(0.001, 0.001); # inormative prior for alpha.X
 pri.beta.X <- c(0.001, 0.001); # inormative prior for beta.X
-pri.KM <- c(0.001, 0.001); # non-informative prior for KM
+pri.KM <- c(1, 0.001); # non-informative prior for KM
 
 tun.KM <- 1; 
 tun.Delta.X <- c(1.0, 1);
@@ -64,10 +71,10 @@ nrepeat <- burn + thin*effrepeat;
 selrow <- seq(from = burn + thin, by = thin, length.out = effrepeat)
 
 #initial value setting 
-theta.X <- c(A.X , B.X)
-theta.Y <- c(A.Y, B.Y, K.M)
+theta.X <- c(1/2*A.X , B.X)
+theta.Y <- c(A.Y, B.Y, 1/3*K.M)
 
-Delta.X <- c(alpha.X, beta.X) #initial & true values of delay parameter of X 
+Delta.X <- c(1/2*alpha.X, 1.5*beta.X) #initial & true values of delay parameter of X 
 Delta.Y <- c(alpha.Y, beta.Y) #initial & true values of delay parameter of Y 
 
 RR.all = array(0, dim = c(max.T, 4, nsample)) #saving number of reaction 
@@ -142,7 +149,7 @@ for(rep in 2:nrepeat) {
     
     # logMH <- q.Y.st - q.Y + prior.X.st - prior.X; # considering prior.
     logMH <- q.Y.st - q.Y; # Completely non-informative, i.e., always prior.X.st == prior.X 
-    
+
     # print(logMH);
     if(!is.nan(logMH) && runif(1)<exp(logMH)){
       X.all[,jj] <- X.star; RR.all[,3,jj] <- X.bir.st; RR.all[,4,jj] <- X.dea.st;
@@ -150,7 +157,9 @@ for(rep in 2:nrepeat) {
     }
   }
   
-  # step  4: samping A.X 
+  g_11 <- sum(K.i);
+  theta[rep,1] = rgamma(1,shape = sum(RR.all[,3,]) + nsample * pri.A.X[1], rate = nsample * (g_11 + pri.A.X[2]));
+  
   if(param_est[1] == 0){
     theta[rep,1] = theta[rep-1,1]
   }else{
@@ -186,7 +195,6 @@ for(rep in 2:nrepeat) {
   R.fit[4*rep-1,,] = RR.all[,3,] # birth number of X
   R.fit[4*rep-0,,] = RR.all[,4,] # death number of X
   
-  
   if(rep%%10 ==0 ){
     cat(rep)
     cat(" ")
@@ -211,6 +219,7 @@ print(paste0("Acceptance ratio for K.M: ", count_KM / nrepeat))  # Acceptance ra
 
 gen.num <- 10
 gen.y2 <- matrix(0, nrow = gen.num, ncol = max.T+1)
+selrow <- 1:420
 for(jj in 1:gen.num){
   myList2 <- TimeDelayGillespieforXY(A.X = colMeans(theta[selrow,])[1], B.X = 0.05, alpha.X = colMeans(theta[selrow,])[3], beta.X = colMeans(theta[selrow,])[4], A.Y = 60, B.Y = 0.05, alpha.Y = 3.6, beta.Y = 0.6, K.M = colMeans(theta[selrow,])[2], repnum = max.T*500, maxT = max.T+3)
   sim.X2 <- approx(myList2$TList[!is.na(myList2$TList)], myList2$XList[!is.na(myList2$XList)], xout = seq(from = 0, to = max.T, by=1), method = "constant", yleft = 0, yright = max(myList2$XList[!is.na(myList2$XList)]))$y
@@ -227,6 +236,4 @@ matplot(0:max.T, Y.all, type = "l", ylim = c(0,600))
 matplot(0:max.T, Y.all, type = "l", ylim = c(0,150), xlim = c(0,40))
 
 matplot(0:max.T, Y.all1, type = "l", ylim = c(0,250))
-
-
 
