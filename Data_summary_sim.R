@@ -1,41 +1,153 @@
-# install.packages("Rfast")
-# library(Rfast)
+setwd("D:/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/timedelayGitCode/")
+source("2stepDDE_functions.R")
+# setwd("D:/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/timedelayGitCode/")
+# setwd("/Users/hyukpyohong/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/timedelayGitCode/")
+# setwd("/Users/hyukpyohong/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/CodeForSobolev/Data_from_simulation/")
 
-setwd("D:/OneDrive - kaist.ac.kr/Research/ResearchMaterial_HHP/TimeDelayEstimation/CodeForSobolev/Data_from_simulation")
 
-# For max.T == 25
-filenameDigit <- c("20200531000829", "20200601235510", "20200601232603")[3]
-max.T <- 25
-# For max.T == 50
-filenameDigit <- c("20200406234838", "20200406235258", "20200406235329", "20200406235656", "20200407001113")[1]
-max.T <- 50
-# For max.T == 100
-filenameDigit <- c("20200407034525", "20200407041011", "20200407045155", "20200407062228", "20200407083413")[5]
-max.T <- 100
+args1 = 1
 
-raw.Table <- read.csv(file = paste0("Parameters_commonX_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)
-raw.Table <- read.csv(file = paste0("Parameters_multiX_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)
+flg1 = 0
+set_comb = matrix(NA, nrow = 60, ncol = 5)
 
-# raw.Table <- read.csv(file = "Parameters_maxT25_20200406220145.csv", header = F)
-# raw.Table <- read.csv(file = "Parameters_maxT25_20200406220555.csv", header = F)
-# raw.Table <- read.csv(file = "Parameters_maxT25_20200406221108.csv", header = F)
-# raw.Table <- read.csv(file = "Parameters_maxT25_20200406221149.csv", header = F)
-true.X <- read.csv(file = paste0("Etc_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)[,1]
-true.Y <- read.csv(file = paste0("Etc_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)[,2]
-fit.X <- t(read.csv(file = paste0("Xtrj_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F))
-AR.A.X <- read.csv(file = paste0("Etc_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)[1,4]
-AR.KM <- read.csv(file = paste0("Etc_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)[2,4]
-AR.delay <- read.csv(file = paste0("Etc_maxT", max.T ,"_", filenameDigit, ".csv", sep = ""), header = F)[3,4]
+for(effrepeat in c(1100000)){
+  for(max.T in c(30, 50, 150)){
+    for(nsample in c(5, 10, 20, 40)){
+      for(param_num in c(3)){
+        for (km_ratio in c(0.2, 0.5, 1, 2, 5)){
+          flg1 = flg1 +1
+          set_comb[flg1, ] = c(effrepeat, max.T, nsample, param_num, km_ratio)
+        }
+      }
+    }
+  }
+}
 
-raw.Table <- theta
-true.Y <- Y
+effrepeat = set_comb[args1, 1]
+max.T = set_comb[args1, 2]
+nsample = set_comb[args1, 3]
+param_num = set_comb[args1, 4]
+km_ratio = set_comb[args1, 5]
 
-A.X <- raw.Table[,1]
-KM <- raw.Table[,2]
-alpha.X <- raw.Table[,3]
-beta.X <- raw.Table[,4]
-delayMean <- alpha.X/beta.X
-delayVar <- alpha.X/beta.X^2
+
+if (param_num == 1){
+  param_est <- c(1,1,1,1,1,1,1,0) # AX KM alphaX betaX AY alphaY betaY B
+}else if(param_num == 2){
+  param_est <- c(1,1,1,1,1,0,0,0) # AX KM alphaX betaX AY alphaY betaY B
+}else if(param_num == 3){
+  param_est <- c(1,0,1,1,1,0,0,0) # AX KM alphaX betaX AY alphaY betaY B
+}else if(param_num == 4){
+  param_est <- c(1,1,1,1,0,0,0,0) # AX KM alphaX betaX AY alphaY betaY B
+}else if(param_num == 5){
+  param_est <- c(0,1,1,1,0,0,0,0) # AX KM alphaX betaX AY alphaY betaY B
+}else{
+  param_est <- c(0,0,1,1,0,0,0,0) # AX KM alphaX betaX AY alphaY betaY B
+}
+
+int <- 1; 
+
+# known (fixed) parameters
+B.X <- 0.05*int;  
+B.Y <- 0.05*int; 
+A.Y <- 60*int; 
+alpha.Y <- 3.6; beta.Y <- 0.6*int;  
+
+# unknowns parameters
+A.X <- 10*int; alpha.X <- 3.6; beta.X <- 0.6*int; 
+K.M <- 200; 
+
+tspan <- 0:max.T
+
+# install.packages("stringr")
+library(stringr)
+
+
+for(fileidx in 1:dim(filename.list)[1]){
+  filename.current = filename.list[fileidx, 1]
+  param_num = as.numeric(substr(filename.current, 22,22))
+  theta.est = read.table(paste("Theta", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+  repnum = sum(theta.est[,1] > 0)
+  reaction.numbers.true = read.table(paste("Reaction_numbers", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+  max.T = dim(reaction.numbers.true)[1]
+  nsample = dim(reaction.numbers.true)[2]/4
+  update.numbers.est = read.table(paste("Update_numbers", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+  priors.true = read.table(paste("Priors", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+  
+  Xbirth.true = reaction.numbers.true[,1:nsample]
+  Xdeath.true = reaction.numbers.true[,(nsample+1):(2*nsample)]
+  Ybirth.true = reaction.numbers.true[,(2*nsample+1):(3*nsample)]
+  Ydeath.true = reaction.numbers.true[,(3*nsample+1):(4*nsample)]
+  
+  if (param_num == 1 & max.T = 150){
+    selrow = seq(from = 510, by = 10, to = repnum)
+    theta.est
+  }
+}
+
+
+fileidx = 1
+
+filename.current = filename.list[fileidx, 1]
+param_num = as.numeric(substr(filename.current, 22,22))
+theta.est = read.table(paste("Theta", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+repnum = sum(theta.est[,1] > 0)
+selrow = seq(from = 1010, by = 10, to = repnum)
+theta.est = theta.est[selrow,]
+reaction.numbers.true = read.table(paste("Reaction_numbers", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+max.T = dim(reaction.numbers.true)[1]
+nsample = dim(reaction.numbers.true)[2]/4
+update.numbers.est = read.table(paste("Update_numbers", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+priors.true = read.table(paste("Priors", substr(filename.current,7,str_length(filename.current)), sep = ""), sep = ",")
+
+Xbirth.true = reaction.numbers.true[,1:nsample]
+Xdeath.true = reaction.numbers.true[,(nsample+1):(2*nsample)]
+Ybirth.true = reaction.numbers.true[,(2*nsample+1):(3*nsample)]
+Ydeath.true = reaction.numbers.true[,(3*nsample+1):(4*nsample)]
+
+param.name.list = c("AX", "KM", "alphaX", "betaX", "AY", "alphaY", "betaY", "B")
+par(mfrow = c(3, 3))
+for (param.id in 1:8){
+  plot(theta.est[,param.id], type = "l" , col = rgb(0/255,0/255,0/255, 0.6),
+       xlab = "", ylab = "", bty = "n")
+  # xlim = c(0,15), ylim = c(0,15)
+  axis(side = 1, lwd = 2)
+  axis(side = 2, lwd = 2)
+  mtext(side=1, line=2, "Iteration", font=1.6,cex=1.2)
+  mtext(side=2, line=2, param.name.list[param.id], font=1.6,cex=1.2)
+}
+
+plot(theta.est[,3]/theta.est[,4], type = "l" , col = rgb(0/255,0/255,0/255, 0.6),
+     xlab = "Iteration", ylab = "X delay", bty = "n")
+# xlim = c(0,15), ylim = c(0,15)
+axis(side = 1, lwd = 2)
+axis(side = 2, lwd = 2)
+mtext(side=1, line=2, "Iteration", font=1.6,cex=1.2)
+mtext(side=2, line=2, "", font=1.6,cex=1.2)
+
+par(mfrow = c(1,1))
+plot(theta.est[,3]/theta.est[,4],theta.est[,6]/theta.est[,7], col = rgb(0/255,0/255,0/255, 0.6),
+     xlab = "", ylab = "", bty = "n", xlim = c(0,15), ylim = c(0,15))
+axis(side = 1, lwd = 2)
+axis(side = 2, lwd = 2)
+lines(c(0,12), c(12,0), lwd = 2, col = rgb(216/255,75/255,36/255, 0.8))
+mtext(side=1, line=2, "X delay", font=1.6,cex=1.2)
+mtext(side=2, line=2, "Y delay", font=1.6,cex=1.2)
+
+
+plot(theta.est[,1]/theta.est[,2],col = rgb(0/255,0/255,0/255, 0.6),
+     xlab = "", ylab = "", bty = "n")
+
+plot(theta.est[,4],col = rgb(0/255,0/255,0/255, 0.6),
+     xlab = "", ylab = "", bty = "n")
+theta.est[,3]/theta.est[,4]
+
+plot(theta.est[,2], type = "l")
+plot(theta.est[,3], type = "l")
+plot(theta.est[,4], type = "l")
+plot(theta.est[,5], type = "l")
+plot(theta.est[,6], type = "l")
+plot(theta.est[,7], type = "l")
+plot(theta.est[,8], type = "l")
 
 totalData <- as.matrix(cbind(A.X, KM, KM/A.X, alpha.X, beta.X, delayMean, delayVar))
 NmlzData <- totalData / (matrix(rep(c(10,200,20,3.6,0.6,6,10), length(A.X)),ncol = 7,byrow=TRUE))
@@ -115,6 +227,20 @@ plot(theta[,4], type = "l", xlab = "iteration", ylab = "betaX")
 
 ggpairs(data = as.data.frame(totalData))
 
+## ===========2021.04.14. sum of time delays are preserved.
+
+plot(theta[,3]/theta[,4],theta[,6]/theta[,7], 
+     xlim = c(0, 15), ylim = c(0,15), col = rgb(100/255,100/255,100/255, 0.3),
+     xlab = "", ylab = "", bty = "n", main = NULL)
+axis(side = 1, lwd = 2)
+axis(side = 2, lwd = 2)
+mtext(side=1, line=2, "alpha_X", font=1.6,cex=1.2)
+mtext(side=2, line=2, "beta_X", font=1.6,cex=1.2)
+# points(mean(param_now[seq(from = 1000, to = 10000, by = 10),3]), mean(param_now[seq(from = 1000, to = 10000, by = 10),4]), col=rgb(10/255,10/255,10/255, 0.8), lwd = 3, pch = 16)
+# points(3.6,0.6, col=rgb(243/255,135/255,47/255, 0.8), lwd = 2, pch = 1)
+
+plot(theta[,3]/theta[,4], type = "l")
+plot(theta[,3]/theta[,4] + theta[,6]/theta[,7], type = "l")
 
 resultMean
 resultVar
