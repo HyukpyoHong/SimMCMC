@@ -1700,3 +1700,34 @@ log_factorial <- function(x){
   return(val)
 }
 
+
+mean_trajectory <- function(timespan, theta){
+  length_of_T = length(timespan)
+  mean_trj = rep(0, length_of_T)
+  integral_val_partition = rep(0, length_of_T)
+  integral_val = rep(0, length_of_T)
+  
+  integrand2 <- function(tau, theta){
+    return(pgamma(tau, shape = theta[3], rate = theta[4]) * exp(theta[2]* tau))
+  }
+  for (ii in 1:length_of_T){
+    if (ii == 1){
+      integral_val_partition[ii] = integrate(integrand2, lower=0, upper=timespan[ii], theta = theta, abs.tol = 1e-15)$value
+    }
+    else{
+      integral_val_partition[ii] = integrate(integrand2, lower=timespan[ii-1], upper=timespan[ii], theta = theta, abs.tol = 1e-15)$value
+    }
+  }
+  integral_val <- cumsum(integral_val_partition)
+  
+  for (ii in 1:length_of_T){
+    t = timespan[ii];
+    # cat(ii); cat("\n");
+    mean_trj[ii] = theta[1] * exp(-theta[2] * t) * integral_val[ii]
+  }
+  return(mean_trj)
+}
+
+
+
+
