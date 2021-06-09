@@ -1728,6 +1728,65 @@ mean_trajectory <- function(timespan, theta){
   return(mean_trj)
 }
 
+mean_birth <- function(timespan, theta){
+  length_of_T = length(timespan)
+  mean_birth_list = rep(0, length_of_T)
+  integral_val_partition = rep(0, length_of_T)
+  integral_val = rep(0, length_of_T)
+  
+  integrand2 <- function(tau, theta){
+    return(pgamma(tau, shape = theta[3], rate = theta[4]))
+  }
+  for (ii in 1:length_of_T){
+    if (ii == 1){
+      integral_val_partition[ii] = integrate(integrand2, lower=0, upper=timespan[ii], theta = theta, abs.tol = 1e-15)$value
+    }
+    else{
+      integral_val_partition[ii] = integrate(integrand2, lower=timespan[ii-1], upper=timespan[ii], theta = theta, abs.tol = 1e-15)$value
+    }
+  }
+  for (ii in 1:length_of_T){
+    t = timespan[ii];
+    # cat(ii); cat("\n");
+    mean_birth_list[ii] = theta[1] * integral_val_partition[ii]
+  }
+  return(mean_birth_list)
+}
 
+
+log_lik_combine <- function(xbirth, xdeath, ybirth, ydeath, A.X, K.M, alpha.X, beta.X, A.Y, alpha.Y, beta.Y, B){
+  lXB = log_lik_XB(xlist, xbirth, A.X, alpha.X, beta.X)
+  lXD = log_lik_XD(xlist, xdeath, B.X)
+  lYB = log_lik_YB(ybirth, xlist, A.Y, K.M, alpha.Y, beta.Y)
+  lYD = log_lik_YD(ylist, ydeath, B.Y)
+  my_list <- list("lik_XB" = lXB, "lik_XD" = lXD, "lik_YB" = lYB, "lik_YD" = lYD)
+  return(my_list)
+}
+
+log_lik_YB <- function(ybirth, xlist, A.Y, K.M, alpha.Y, beta.Y){
+  fy = A.Y * KI.Y(P = c(alpha.Y, betaY), in.X = xlist , K.M= K.M)
+  log_lik_val = sum(log(dpois(ybirth, fy[,1]) + 1e-300), na.rm = T)
+  return(log_lik_val)
+}
+
+log_lik_YD <- function(ylist, ydeath, B.Y){
+  len1 = length(ylist)
+  ymed = (ylist[1:(len1-1)] + ylist[2:len1])/2
+  log_lik_val = sum(log(dpois(ydeath, B.Y * ymed) + 1e-300), na.rm = T)
+  return(log_lik_val)
+}
+
+log_lik_XB <- function(xlist, xbirth, A.X, alpha.X, beta.X){
+  fx = A.X * KI(P = c(alpha.Y, betaY), maxt = length(xlist))
+  log_lik_val = sum(log(dpois(xbirth, fx) + 1e-300), na.rm = T)
+  return(log_lik_val)
+}
+
+log_lik_XD <- function(xlist, xdeath, B.X){
+  len1 = length(xlist)
+  xmed = (xlist[1:(len1-1)] + xlist[2:len1])/2
+  log_lik_val = sum(log(dpois(xdeath, B.X * xmed) + 1e-300), na.rm = T)
+  return(log_lik_val)
+}
 
 
