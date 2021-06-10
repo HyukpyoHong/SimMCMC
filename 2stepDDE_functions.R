@@ -1755,16 +1755,18 @@ mean_birth <- function(timespan, theta){
 
 
 log_lik_combine <- function(xbirth, xdeath, ybirth, ydeath, A.X, K.M, alpha.X, beta.X, A.Y, alpha.Y, beta.Y, B){
-  lXB = log_lik_XB(xlist, xbirth, A.X, alpha.X, beta.X)
-  lXD = log_lik_XD(xlist, xdeath, B.X)
+  xlist = c(0, cumsum(xbirth - xdeath))
+  ylist = c(0, cumsum(ybirth - ydeath))
+  lXB = log_lik_XB(xbirth, A.X, alpha.X, beta.X)
+  lXD = log_lik_XD(xlist, xdeath, B)
   lYB = log_lik_YB(ybirth, xlist, A.Y, K.M, alpha.Y, beta.Y)
-  lYD = log_lik_YD(ylist, ydeath, B.Y)
+  lYD = log_lik_YD(ylist, ydeath, B)
   my_list <- list("lik_XB" = lXB, "lik_XD" = lXD, "lik_YB" = lYB, "lik_YD" = lYD)
   return(my_list)
 }
 
 log_lik_YB <- function(ybirth, xlist, A.Y, K.M, alpha.Y, beta.Y){
-  fy = A.Y * KI.Y(P = c(alpha.Y, betaY), in.X = xlist , K.M= K.M)
+  fy = A.Y * KI.Y(P = c(alpha.Y, beta.Y), in.X = xlist , K.M= K.M)
   log_lik_val = sum(log(dpois(ybirth, fy[,1]) + 1e-300), na.rm = T)
   return(log_lik_val)
 }
@@ -1776,8 +1778,8 @@ log_lik_YD <- function(ylist, ydeath, B.Y){
   return(log_lik_val)
 }
 
-log_lik_XB <- function(xlist, xbirth, A.X, alpha.X, beta.X){
-  fx = A.X * KI(P = c(alpha.Y, betaY), maxt = length(xlist))
+log_lik_XB <- function(xbirth, A.X, alpha.X, beta.X){
+  fx = A.X * KI(P = c(alpha.X, beta.X), maxt = length(xbirth))
   log_lik_val = sum(log(dpois(xbirth, fx) + 1e-300), na.rm = T)
   return(log_lik_val)
 }
