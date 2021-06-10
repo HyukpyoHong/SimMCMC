@@ -821,8 +821,8 @@ MH.P.X <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, maxt, f
   KI.star <- KI(P.star, maxt = maxt)      # calculating kappa using current alpha & candidate of beta
   KI.m <- KI(P, maxt = maxt)              # calculating kappa using current alpha & beta
   
-  l.lik.st <- sum(r.X.birth * log(KI.star), na.rm = T) - Ax * (sum(KI.star))
-  l.lik <- sum(r.X.birth * log(KI.m), na.rm = T) - Ax * (sum(KI.m))
+  l.lik.st <- sum(r.X.birth * log(KI.star + 1e-300), na.rm = T) - Ax * (sum(KI.star))
+  l.lik <- sum(r.X.birth * log(KI.m + 1e-300), na.rm = T) - Ax * (sum(KI.m))
   
   l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
@@ -868,8 +868,8 @@ MH.P.Y <- function(P,S,rep, r.Y.birth, in.X, Ay, K.M, tun, pri.alpha.Y, pri.beta
   KI.Y.star <- KI.Y(P = P.star, in.X = in.X,  K.M = K.M)      # calculating kappa using current alpha & candidate of beta
   KI.Y.m <- KI.Y(P = P, in.X = in.X,  K.M = K.M)              # calculating kappa using current alpha & beta
   
-  l.lik.st <- sum(r.Y.birth * log(KI.Y.star[,1]), na.rm = T) - Ay * (sum(KI.Y.star[,1])) 
-  l.lik <- sum(r.Y.birth * log(KI.Y.m[,1]), na.rm = T) - Ay * (sum(KI.Y.m[,1]))
+  l.lik.st <- sum(r.Y.birth * log(KI.Y.star[,1] + 1e-300), na.rm = T) - Ay * (sum(KI.Y.star[,1])) 
+  l.lik <- sum(r.Y.birth * log(KI.Y.m[,1] + 1e-300), na.rm = T) - Ay * (sum(KI.Y.m[,1]))
   
   l.prior1.st <- dgamma(P.star[1], pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
   l.prior1    <- dgamma(P[1]     , pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
@@ -918,8 +918,8 @@ MH.P.X.all <- function(P,S,rep, r.X.birth, Ax, tun, pri.alpha.X, pri.beta.X, max
   
   for (i in 1:ncol(r.X.birth)){
     Rii <- r.X.birth[, i]
-    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax * (sum(KI.star))
-    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax * (sum(KI.m))
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star + 1e-300), na.rm = T) - Ax * (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m + 1e-300), na.rm = T) - Ax * (sum(KI.m))
   }
   l.prior1.st <- dgamma(P.star[1], pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
   l.prior1    <- dgamma(P[1]     , pri.alpha.X[1], pri.alpha.X[2], log = TRUE)
@@ -980,8 +980,8 @@ MH.P.X.all.share3 <- function(P,S,rep, r.X.birth1,r.X.birth2,r.X.birth3, Ax, tun
   
   for (i in 1:ncol(r.X.birth3)){
     Rii <- r.X.birth3[, i]
-    l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax[3] * (sum(KI.star))
-    l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax[3] * (sum(KI.m))
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.star + 1e-300), na.rm = T) - Ax[3] * (sum(KI.star))
+    l.lik <- l.lik + sum(Rii * log(KI.m + 1e-300), na.rm = T) - Ax[3] * (sum(KI.m))
   }
   
   
@@ -1036,8 +1036,8 @@ MH.P.X.all.share <- function(P,S,rep, r.X.birth, nsample, Ax, tun, pri.alpha.X, 
     KI.m <- KI(P, maxt = maxt[gg])              # calculating kappa using current alpha & beta
     for (i in 1:nsample[gg]){
       Rii <- r.X.birth[1:maxt[gg],i,gg]
-      l.lik.st <- l.lik.st + sum(Rii * log(KI.star), na.rm = T) - Ax[gg] * (sum(KI.star))
-      l.lik <- l.lik + sum(Rii * log(KI.m), na.rm = T) - Ax[gg] * (sum(KI.m))
+      l.lik.st <- l.lik.st + sum(Rii * log(KI.star + 1e-300), na.rm = T) - Ax[gg] * (sum(KI.star))
+      l.lik <- l.lik + sum(Rii * log(KI.m + 1e-300), na.rm = T) - Ax[gg] * (sum(KI.m))
     }
   }
 
@@ -1069,7 +1069,7 @@ MH.P.X.all.share <- function(P,S,rep, r.X.birth, nsample, Ax, tun, pri.alpha.X, 
 
 
 
-MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, pri.beta.Y, maxt, flatpri = FALSE, lowbnds = c(0,0)) {
+MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, pri.beta.Y, maxt, flatpri = FALSE, lowbnds = c(0,0)){
   count = 0
   repeat{
     u = mvrnorm(1,c(0,0),diag(c(tun[1],tun[2])))
@@ -1089,8 +1089,8 @@ MH.P.Y.all <- function(P,S,rep, r.Y.birth, in.X.all, Ay, K.M, tun, pri.alpha.Y, 
     Rii <- r.Y.birth[, i]
     KI.Y.star <- KI.Y(P.star, in.X = in.X.all[,i], K.M = K.M)      # calculating kappa using current alpha & candidate of beta
     KI.Y.m <- KI.Y(P, in.X = in.X.all[,i], K.M = K.M)              # calculating kappa using current alpha & beta
-    l.lik.st <- l.lik.st + sum(Rii * log(KI.Y.star[,1]), na.rm = T) - Ay * (sum(KI.Y.star[,1]))
-    l.lik <- l.lik + sum(Rii * log(KI.Y.m[,1]), na.rm = T) - Ay * (sum(KI.Y.m[,1]))
+    l.lik.st <- l.lik.st + sum(Rii * log(KI.Y.star[,1] + 1e-300), na.rm = T) - Ay * (sum(KI.Y.star[,1]))
+    l.lik <- l.lik + sum(Rii * log(KI.Y.m[,1] + 1e-300), na.rm = T) - Ay * (sum(KI.Y.m[,1]))
   }
   l.prior1.st <- dgamma(P.star[1], pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
   l.prior1    <- dgamma(P[1]     , pri.alpha.Y[1], pri.alpha.Y[2], log = TRUE)
